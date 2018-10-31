@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 .source-footer {
   background: var(--theme-body-background);
   border-top: 1px solid var(--theme-splitter-color);
@@ -41,8 +45,8 @@
   justify-content: center;
 }
 
-.source-footer > .commands > button.action:focus {
-  outline: none;
+.source-footer > .commands > button.action:hover {
+  background: var(--theme-toolbar-background-hover);
 }
 
 :root.theme-dark .source-footer > .commands > .action {
@@ -51,6 +55,12 @@
 
 :root.theme-dark .source-footer > .commands > .action:hover {
   fill: var(--theme-selection-color);
+}
+
+.source-footer > .commands > div.loader {
+  vertical-align: top;
+  width: 20px;
+  margin: 0 4px;
 }
 
 .source-footer > .commands > .action > img.prettyPrint {
@@ -81,6 +91,14 @@
   background: var(--theme-highlight-blue);
 }
 
-.source-footer .blackbox-summary {
+.source-footer .blackbox-summary,
+.source-footer .mapped-source {
   color: var(--theme-body-color);
+  padding-left: 2.5px;
+}
+
+.source-footer .mapped-source {
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }

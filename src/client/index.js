@@ -1,29 +1,52 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
 import * as firefox from "./firefox";
-import * as chrome from "./chrome";
 
-import { prefs, features } from "../utils/prefs";
-import { isFirefoxPanel } from "devtools-config";
+import { prefs, asyncStore } from "../utils/prefs";
+import { setupHelper } from "../utils/dbg";
+
 import {
   bootstrapApp,
   bootstrapStore,
   bootstrapWorkers
 } from "../utils/bootstrap";
+import { initialBreakpointsState } from "../reducers/breakpoints";
 
 function loadFromPrefs(actions: Object) {
-  const { pauseOnExceptions, ignoreCaughtExceptions } = prefs;
-  if (pauseOnExceptions || ignoreCaughtExceptions) {
-    return actions.pauseOnExceptions(pauseOnExceptions, ignoreCaughtExceptions);
+  const { pauseOnExceptions, pauseOnCaughtExceptions } = prefs;
+  if (pauseOnExceptions || pauseOnCaughtExceptions) {
+    return actions.pauseOnExceptions(
+      pauseOnExceptions,
+      pauseOnCaughtExceptions
+    );
   }
 }
 
-function getClient(connection: any) {
-  const { tab: { clientType } } = connection;
-  return clientType == "firefox" ? firefox : chrome;
+function syncXHRBreakpoints() {
+  asyncStore.xhrBreakpoints.then(bps => {
+    bps.forEach(({ path, method, disabled }) => {
+      if (!disabled) {
+        firefox.clientCommands.setXHRBreakpoint(path, method);
+      }
+    });
+  });
 }
 
-async function onConnect(
+async function loadInitialState() {
+  const pendingBreakpoints = await asyncStore.pendingBreakpoints;
+  const tabs = await asyncStore.tabs;
+  const xhrBreakpoints = await asyncStore.xhrBreakpoints;
+
+  const breakpoints = initialBreakpointsState(xhrBreakpoints);
+
+  return { pendingBreakpoints, tabs, breakpoints };
+}
+
+export async function onConnect(
   connection: Object,
   { services, toolboxActions }: Object
 ) {
@@ -32,43 +55,30 @@ async function onConnect(
     return;
   }
 
-  const client = getClient(connection);
-  const commands = client.clientCommands;
-  const { store, actions, selectors } = bootstrapStore(commands, {
-    services,
-    toolboxActions
+  const commands = firefox.clientCommands;
+  const initialState = await loadInitialState();
+  const { store, actions, selectors } = bootstrapStore(
+    commands,
+    {
+      services,
+      toolboxActions
+    },
+    initialState
+  );
+
+  const workers = bootstrapWorkers();
+  await firefox.onConnect(connection, actions);
+  await loadFromPrefs(actions);
+  syncXHRBreakpoints();
+  setupHelper({
+    store,
+    actions,
+    selectors,
+    workers: { ...workers, ...services },
+    connection,
+    client: firefox.clientCommands
   });
 
-  bootstrapWorkers();
-  const { bpClients } = await client.onConnect(connection, actions);
-  await loadFromPrefs(actions);
-
-  window.getGlobalsForTesting = () => {
-    return {
-      store,
-      actions,
-      selectors,
-      client: client.clientCommands,
-      prefs,
-      features,
-      connection,
-      bpClients,
-      services
-    };
-  };
-
-  if (!isFirefoxPanel()) {
-    console.group("Development Notes");
-    const baseUrl = "https://devtools-html.github.io/debugger.html";
-    const localDevelopmentUrl = `${baseUrl}/docs/local-development.html`;
-    console.log("Debugging Tips", localDevelopmentUrl);
-    console.log("getGlobalsForTesting", window.getGlobalsForTesting());
-    console.groupEnd();
-  }
-
-  bootstrapApp(connection, { store, actions });
-
+  bootstrapApp(store);
   return { store, actions, selectors, client: commands };
 }
-
-export { onConnect };

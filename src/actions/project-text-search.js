@@ -1,8 +1,8 @@
-// @flow
-
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
+// @flow
 
 /**
  * Redux actions for the search state
@@ -10,63 +10,75 @@
  */
 
 import { findSourceMatches } from "../workers/search";
-import { getSources, getSource } from "../selectors";
-import { isThirdParty, isLoaded } from "../utils/source";
-import { loadAllSources } from "./sources";
+import { getSource, hasPrettySource, getSourceList } from "../selectors";
+import { isThirdParty } from "../utils/source";
+import { loadSourceText } from "./sources/loadSourceText";
+import { statusType } from "../reducers/project-text-search";
 
-import type { ThunkArgs } from "./types";
+import type { Action, ThunkArgs } from "./types";
 
-export function addSearchQuery(query: string) {
-  return ({ dispatch, getState }: ThunkArgs) => {
-    dispatch({ type: "ADD_QUERY", query });
+export function addSearchQuery(query: string): Action {
+  return { type: "ADD_QUERY", query };
+}
+
+export function clearSearchQuery(): Action {
+  return { type: "CLEAR_QUERY" };
+}
+
+export function addSearchResult(
+  sourceId: string,
+  filepath: string,
+  matches: Object[]
+): Action {
+  return {
+    type: "ADD_SEARCH_RESULT",
+    result: { sourceId, filepath, matches }
   };
 }
 
-export function clearSearchQuery() {
-  return ({ dispatch, getState }: ThunkArgs) => {
-    dispatch({ type: "CLEAR_QUERY" });
-  };
+export function clearSearchResults(): Action {
+  return { type: "CLEAR_SEARCH_RESULTS" };
 }
 
-export function clearSearchResults() {
-  return ({ dispatch, getState }: ThunkArgs) => {
-    dispatch({ type: "CLEAR_SEARCH_RESULTS" });
-  };
+export function clearSearch(): Action {
+  return { type: "CLEAR_SEARCH" };
+}
+
+export function updateSearchStatus(status: string): Action {
+  return { type: "UPDATE_STATUS", status };
+}
+
+export function closeProjectSearch(): Action {
+  return { type: "CLOSE_PROJECT_SEARCH" };
 }
 
 export function searchSources(query: string) {
   return async ({ dispatch, getState }: ThunkArgs) => {
     await dispatch(clearSearchResults());
     await dispatch(addSearchQuery(query));
-    await dispatch(loadAllSources());
-    const sources = getSources(getState());
-    const validSources = sources
-      .valueSeq()
-      .filter(source => isLoaded(source.toJS()) && !isThirdParty(source.toJS()))
-      .toJS();
-
+    dispatch(updateSearchStatus(statusType.fetching));
+    const validSources = getSourceList(getState()).filter(
+      source => !hasPrettySource(getState(), source.id) && !isThirdParty(source)
+    );
     for (const source of validSources) {
+      await dispatch(loadSourceText(source));
       await dispatch(searchSource(source.id, query));
     }
+    dispatch(updateSearchStatus(statusType.done));
   };
 }
 
 export function searchSource(sourceId: string, query: string) {
   return async ({ dispatch, getState }: ThunkArgs) => {
-    const sourceRecord = getSource(getState(), sourceId);
-    if (!sourceRecord) {
+    const source = getSource(getState(), sourceId);
+    if (!source) {
       return;
     }
 
-    const source = sourceRecord.toJS();
     const matches = await findSourceMatches(source, query);
-    dispatch({
-      type: "ADD_SEARCH_RESULT",
-      result: {
-        sourceId: source.id,
-        filepath: source.url,
-        matches
-      }
-    });
+    if (!matches.length) {
+      return;
+    }
+    dispatch(addSearchResult(source.id, source.url, matches));
   };
 }

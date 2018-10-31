@@ -1,165 +1,178 @@
-// @flow
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
+// @flow
 
 /**
  * Sources reducer
  * @module reducers/sources
  */
 
-import * as I from "immutable";
 import { createSelector } from "reselect";
-import makeRecord from "../utils/makeRecord";
-import { getPrettySourceURL } from "../utils/source";
+import {
+  getPrettySourceURL,
+  underRoot,
+  getRelativeUrl,
+  isGenerated,
+  isOriginal as isOriginalSource
+} from "../utils/source";
+import { originalToGeneratedId } from "devtools-source-map";
 import { prefs } from "../utils/prefs";
 
-import type { Map, List } from "immutable";
-import type { Source, Location } from "../types";
-import type { SelectedLocation, PendingSelectedLocation } from "./types";
-import type { Action } from "../actions/types";
-import type { Record } from "../utils/makeRecord";
+import type { Source, SourceId, Location } from "../types";
+import type { PendingSelectedLocation } from "./types";
+import type { Action, DonePromiseAction } from "../actions/types";
+import type { LoadSourceAction } from "../actions/types/SourceAction";
 
-type Tab = string;
-export type SourceRecord = Record<Source>;
-export type SourcesMap = Map<string, SourceRecord>;
-type TabList = List<Tab>;
+export type SourcesMap = { [string]: Source };
+
+type UrlsMap = { [string]: SourceId[] };
 
 export type SourcesState = {
   sources: SourcesMap,
-  selectedLocation?: SelectedLocation,
+  urls: UrlsMap,
+  relativeSources: SourcesMap,
   pendingSelectedLocation?: PendingSelectedLocation,
-  selectedLocation?: Location,
-  tabs: TabList
+  selectedLocation: ?Location,
+  projectDirectoryRoot: string
 };
 
-export function initialState(): Record<SourcesState> {
-  return makeRecord(
-    ({
-      sources: I.Map(),
-      selectedLocation: undefined,
-      pendingSelectedLocation: prefs.pendingSelectedLocation,
-      sourcesText: I.Map(),
-      tabs: I.List(restoreTabs())
-    }: SourcesState)
-  )();
+export function initialSourcesState(): SourcesState {
+  return {
+    sources: {},
+    urls: {},
+    relativeSources: {},
+    selectedLocation: undefined,
+    pendingSelectedLocation: prefs.pendingSelectedLocation,
+    projectDirectoryRoot: prefs.projectDirectoryRoot
+  };
+}
+
+export function createSource(source: Object): Source {
+  return {
+    id: undefined,
+    url: undefined,
+    sourceMapURL: undefined,
+    isBlackBoxed: false,
+    isPrettyPrinted: false,
+    isWasm: false,
+    text: undefined,
+    contentType: "",
+    error: undefined,
+    loadedState: "unloaded",
+    ...source
+  };
 }
 
 function update(
-  state: Record<SourcesState> = initialState(),
+  state: SourcesState = initialSourcesState(),
   action: Action
-): Record<SourcesState> {
+): SourcesState {
   let location = null;
 
   switch (action.type) {
+    case "UPDATE_SOURCE": {
+      const source = action.source;
+      return updateSources(state, [source]);
+    }
+
     case "ADD_SOURCE": {
       const source = action.source;
-      return updateSource(state, source);
+      return updateSources(state, [source]);
     }
 
     case "ADD_SOURCES": {
-      action.sources.forEach(source => {
-        state = state.mergeIn(["sources", source.id], source);
-      });
-
-      return state;
+      return updateSources(state, action.sources);
     }
 
-    case "SELECT_SOURCE":
-      if (action.status != "start") {
-        return state;
-      }
-
+    case "SET_SELECTED_LOCATION":
       location = {
         ...action.location,
         url: action.source.url
       };
 
-      prefs.pendingSelectedLocation = location;
-      return state
-        .set("selectedLocation", {
+      if (action.source.url) {
+        prefs.pendingSelectedLocation = location;
+      }
+
+      return {
+        ...state,
+        selectedLocation: {
           sourceId: action.source.id,
           ...action.location
-        })
-        .set("pendingSelectedLocation", location);
+        },
+        pendingSelectedLocation: location
+      };
 
-    case "CLEAR_SELECTED_SOURCE":
+    case "CLEAR_SELECTED_LOCATION":
       location = { url: "" };
       prefs.pendingSelectedLocation = location;
 
-      return state
-        .set("selectedLocation", { sourceId: "" })
-        .set("pendingSelectedLocation", location);
+      return {
+        ...state,
+        selectedLocation: null,
+        pendingSelectedLocation: location
+      };
 
-    case "SELECT_SOURCE_URL":
+    case "SET_PENDING_SELECTED_LOCATION":
       location = {
         url: action.url,
         line: action.line
       };
 
       prefs.pendingSelectedLocation = location;
-      return state.set("pendingSelectedLocation", location);
-
-    case "ADD_TAB":
-      return state.merge({
-        tabs: updateTabList({ sources: state }, action.source.url)
-      });
-
-    case "MOVE_TAB":
-      return state.merge({
-        tabs: updateTabList({ sources: state }, action.url, action.tabIndex)
-      });
-
-    case "CLOSE_TAB":
-      prefs.tabs = action.tabs;
-      return state.merge({ tabs: action.tabs });
-
-    case "CLOSE_TABS":
-      prefs.tabs = action.tabs;
-      return state.merge({ tabs: action.tabs });
+      return { ...state, pendingSelectedLocation: location };
 
     case "LOAD_SOURCE_TEXT":
       return setSourceTextProps(state, action);
 
     case "BLACKBOX":
       if (action.status === "done") {
-        return state.setIn(
-          ["sources", action.source.id, "isBlackBoxed"],
-          action.value.isBlackBoxed
-        );
+        const { id, url } = action.source;
+        const { isBlackBoxed } = ((action: any): DonePromiseAction).value;
+        updateBlackBoxList(url, isBlackBoxed);
+        return updateSources(state, [{ id, isBlackBoxed }]);
       }
       break;
 
-    case "TOGGLE_PRETTY_PRINT":
-      return setSourceTextProps(state, action);
+    case "SET_PROJECT_DIRECTORY_ROOT":
+      return recalculateRelativeSources(state, action.url);
 
     case "NAVIGATE":
-      const source = getSelectedSource({ sources: state });
-      const url = source && source.get("url");
+      const source =
+        state.selectedLocation &&
+        state.sources[state.selectedLocation.sourceId];
+
+      const url = source && source.url;
 
       if (!url) {
-        return initialState();
+        return initialSourcesState();
       }
 
-      return initialState().set("pendingSelectedLocation", { url });
+      return { ...initialSourcesState(), url };
   }
 
   return state;
 }
 
-function getTextPropsFromAction(action: any) {
-  const source = action.source;
-  const { value } = action;
+function getTextPropsFromAction(action) {
+  const { sourceId } = action;
 
   if (action.status === "start") {
-    return { id: source.id, loadedState: "loading" };
+    return { id: sourceId, loadedState: "loading" };
   } else if (action.status === "error") {
-    return { id: source.id, error: action.error, loadedState: "loaded" };
+    return { id: sourceId, error: action.error, loadedState: "loaded" };
   }
+
+  if (!action.value) {
+    return null;
+  }
+
   return {
-    text: value.text,
-    id: source.id,
-    contentType: value.contentType,
+    id: sourceId,
+    text: action.value.text,
+    contentType: action.value.contentType,
     loadedState: "loaded"
   };
 }
@@ -168,113 +181,103 @@ function getTextPropsFromAction(action: any) {
 // asynchronous actions is wrong. The `value` may be null for the
 // "start" and "error" states but we don't type it like that. We need
 // to rethink how we type async actions.
-function setSourceTextProps(state, action: any): Record<SourcesState> {
-  const text = getTextPropsFromAction(action);
-  return updateSource(state, text);
+function setSourceTextProps(state, action: LoadSourceAction): SourcesState {
+  const source = getTextPropsFromAction(action);
+  if (!source) {
+    return state;
+  }
+  return updateSources(state, [source]);
 }
 
-function updateSource(state: Record<SourcesState>, source: Object | Source) {
+function updateSources(state, sources) {
+  state = {
+    ...state,
+    sources: { ...state.sources },
+    relativeSources: { ...state.relativeSources },
+    urls: { ...state.urls }
+  };
+
+  return sources.reduce(
+    (newState, source) => updateSource(newState, source),
+    state
+  );
+}
+
+function updateSource(state: SourcesState, source: Object) {
   if (!source.id) {
     return state;
   }
 
-  return state.mergeIn(["sources", source.id], source);
-}
+  const existingSource = state.sources[source.id];
+  const updatedSource = existingSource
+    ? { ...existingSource, ...source }
+    : createSource(source);
 
-export function removeSourceFromTabList(tabs: any, url: string) {
-  return tabs.filter(tab => tab != url);
-}
+  state.sources[source.id] = updatedSource;
 
-export function removeSourcesFromTabList(tabs: any, urls: Array<string>) {
-  return urls.reduce((t, url) => removeSourceFromTabList(t, url), tabs);
-}
+  const existingUrls = state.urls[source.url];
+  state.urls[source.url] = existingUrls
+    ? [...existingUrls, source.id]
+    : [source.id];
 
-function restoreTabs() {
-  const prefsTabs = prefs.tabs || [];
-  if (prefsTabs.length == 0) {
-    return;
-  }
-
-  return prefsTabs;
-}
-
-/**
- * Adds the new source to the tab list if it is not already there
- * @memberof reducers/sources
- * @static
- */
-function updateTabList(state: OuterState, url: ?string, tabIndex?: number) {
-  let tabs = state.sources.get("tabs");
-
-  const urlIndex = tabs.indexOf(url);
-  const includesUrl = !!tabs.find(tab => tab == url);
-
-  if (includesUrl) {
-    if (tabIndex != undefined) {
-      tabs = tabs.delete(urlIndex).insert(tabIndex, url);
-    }
-  } else {
-    tabs = tabs.insert(0, url);
-  }
-
-  prefs.tabs = tabs.toJS();
-  return tabs;
-}
-
-/**
- * Gets the next tab to select when a tab closes. Heuristics:
- * 1. if the selected tab is available, it remains selected
- * 2. if it is gone, the next available tab to the left should be active
- * 3. if the first tab is active and closed, select the second tab
- *
- * @memberof reducers/sources
- * @static
- */
-export function getNewSelectedSourceId(
-  state: OuterState,
-  availableTabs: any
-): string {
-  const selectedLocation = state.sources.selectedLocation;
-  if (!selectedLocation) {
-    return "";
-  }
-
-  const selectedTab = state.sources.sources.get(selectedLocation.sourceId);
-
-  const selectedTabUrl = selectedTab ? selectedTab.get("url") : "";
-
-  if (availableTabs.includes(selectedTabUrl)) {
-    const sources = state.sources.sources;
-    if (!sources) {
-      return "";
-    }
-
-    const selectedSource = sources.find(
-      source => source.get("url") == selectedTabUrl
-    );
-
-    if (selectedSource) {
-      return selectedSource.get("id");
-    }
-
-    return "";
-  }
-
-  const tabUrls = state.sources.tabs.toJS();
-  const leftNeighborIndex = Math.max(tabUrls.indexOf(selectedTabUrl) - 1, 0);
-  const lastAvailbleTabIndex = availableTabs.size - 1;
-  const newSelectedTabIndex = Math.min(leftNeighborIndex, lastAvailbleTabIndex);
-  const availableTab = availableTabs.toJS()[newSelectedTabIndex];
-  const tabSource = getSourceByUrlInSources(
-    state.sources.sources,
-    availableTab
+  updateRelativeSource(
+    state.relativeSources,
+    updatedSource,
+    state.projectDirectoryRoot
   );
 
-  if (tabSource) {
-    return tabSource.get("id");
+  return state;
+}
+
+function updateRelativeSource(
+  relativeSources: SourcesMap,
+  source: Source,
+  root: string
+): SourcesMap {
+  if (!underRoot(source, root)) {
+    return relativeSources;
   }
 
-  return "";
+  const relativeSource: Source = ({
+    ...source,
+    relativeUrl: getRelativeUrl(source, root)
+  }: any);
+
+  relativeSources[source.id] = relativeSource;
+
+  return relativeSources;
+}
+
+function recalculateRelativeSources(state: SourcesState, root: string) {
+  prefs.projectDirectoryRoot = root;
+
+  const relativeSources = (Object.values(state.sources): any).reduce(
+    (sources, source: Source) => updateRelativeSource(sources, source, root),
+    {}
+  );
+
+  return {
+    ...state,
+    projectDirectoryRoot: root,
+    relativeSources
+  };
+}
+
+function updateBlackBoxList(url, isBlackBoxed) {
+  const tabs = getBlackBoxList();
+  const i = tabs.indexOf(url);
+  if (i >= 0) {
+    if (!isBlackBoxed) {
+      tabs.splice(i, 1);
+    }
+  } else if (isBlackBoxed) {
+    tabs.push(url);
+  }
+  prefs.tabsBlackBoxed = tabs;
+}
+
+export function getBlackBoxList() {
+  return prefs.tabsBlackBoxed || [];
 }
 
 // Selectors
@@ -286,16 +289,68 @@ export function getNewSelectedSourceId(
 // top-level app state, so we'd have to "wrap" them to automatically
 // pick off the piece of state we're interested in. It's impossible
 // (right now) to type those wrapped functions.
-type OuterState = { sources: Record<SourcesState> };
+type OuterState = { sources: SourcesState };
 
-const getSourcesState = state => state.sources;
+const getSourcesState = (state: OuterState) => state.sources;
 
 export function getSource(state: OuterState, id: string) {
   return getSourceInSources(getSources(state), id);
 }
 
-export function getSourceByURL(state: OuterState, url: string): ?SourceRecord {
-  return getSourceByUrlInSources(state.sources.sources, url);
+export function getSourceFromId(state: OuterState, id: string): Source {
+  return getSourcesState(state).sources[id];
+}
+
+export function getOriginalSourceByURL(
+  state: OuterState,
+  url: string
+): ?Source {
+  return getOriginalSourceByUrlInSources(
+    getSources(state),
+    getUrls(state),
+    url
+  );
+}
+
+export function getGeneratedSourceByURL(
+  state: OuterState,
+  url: string
+): ?Source {
+  return getGeneratedSourceByUrlInSources(
+    getSources(state),
+    getUrls(state),
+    url
+  );
+}
+
+export function getSpecificSourceByURL(
+  state: OuterState,
+  url: string,
+  isOriginal: boolean
+): ?Source {
+  return isOriginal
+    ? getOriginalSourceByUrlInSources(getSources(state), getUrls(state), url)
+    : getGeneratedSourceByUrlInSources(getSources(state), getUrls(state), url);
+}
+
+export function getSourceByURL(state: OuterState, url: string): ?Source {
+  return getSourceByUrlInSources(getSources(state), getUrls(state), url);
+}
+
+export function getSourcesByURLs(state: OuterState, urls: string[]) {
+  return urls.map(url => getSourceByURL(state, url)).filter(Boolean);
+}
+
+export function getSourcesByURL(state: OuterState, url: string): Source[] {
+  return getSourcesByUrlInSources(getSources(state), getUrls(state), url);
+}
+
+export function getGeneratedSource(state: OuterState, source: Source): Source {
+  if (isGenerated(source)) {
+    return source;
+  }
+
+  return getSourceFromId(state, originalToGeneratedId(source.id));
 }
 
 export function getPendingSelectedLocation(state: OuterState) {
@@ -308,51 +363,102 @@ export function getPrettySource(state: OuterState, id: string) {
     return;
   }
 
-  return getSourceByURL(state, getPrettySourceURL(source.get("url")));
+  return getSpecificSourceByURL(state, getPrettySourceURL(source.url), true);
 }
 
-function getSourceByUrlInSources(sources: SourcesMap, url: string) {
-  if (!url) {
+export function hasPrettySource(state: OuterState, id: string) {
+  return !!getPrettySource(state, id);
+}
+
+export function getOriginalSourceByUrlInSources(
+  sources: SourcesMap,
+  urls: UrlsMap,
+  url: string
+) {
+  const foundSources = getSourcesByUrlInSources(sources, urls, url);
+  if (!foundSources) {
     return null;
   }
 
-  return sources.find(source => source.get("url") === url);
+  return foundSources.find(source => isOriginalSource(source) == true);
 }
-
-export function getSourceInSources(
+export function getGeneratedSourceByUrlInSources(
   sources: SourcesMap,
-  id: string
-): SourceRecord {
-  return sources.get(id);
+  urls: UrlsMap,
+  url: string
+) {
+  const foundSources = getSourcesByUrlInSources(sources, urls, url);
+  if (!foundSources) {
+    return null;
+  }
+
+  return foundSources.find(source => isOriginalSource(source) == false);
 }
 
-export const getSources = createSelector(
-  getSourcesState,
-  sources => sources.sources
-);
+export function getSpecificSourceByUrlInSources(
+  sources: SourcesMap,
+  urls: UrlsMap,
+  url: string,
+  isOriginal: boolean
+) {
+  return isOriginal
+    ? getOriginalSourceByUrlInSources(sources, urls, url)
+    : getGeneratedSourceByUrlInSources(sources, urls, url);
+}
 
-const getTabs = createSelector(getSourcesState, sources => sources.tabs);
-
-export const getSourceTabs = createSelector(
-  getTabs,
-  getSources,
-  (tabs, sources) => tabs.filter(tab => getSourceByUrlInSources(sources, tab))
-);
-
-export const getSearchTabs = createSelector(
-  getTabs,
-  getSources,
-  (tabs, sources) => tabs.filter(tab => !getSourceByUrlInSources(sources, tab))
-);
-
-export const getSourcesForTabs = createSelector(
-  getSourceTabs,
-  getSources,
-  (tabs: TabList, sources: SourcesMap) => {
-    return tabs
-      .map(tab => getSourceByUrlInSources(sources, tab))
-      .filter(source => source);
+export function getSourceByUrlInSources(
+  sources: SourcesMap,
+  urls: UrlsMap,
+  url: string
+) {
+  const foundSources = getSourcesByUrlInSources(sources, urls, url);
+  if (!foundSources) {
+    return null;
   }
+
+  return foundSources[0];
+}
+
+function getSourcesByUrlInSources(
+  sources: SourcesMap,
+  urls: UrlsMap,
+  url: string
+) {
+  if (!url || !urls[url]) {
+    return [];
+  }
+
+  return urls[url].map(id => sources[id]);
+}
+
+export function getSourcesUrlsInSources(state: OuterState, url: string) {
+  const urls = getUrls(state);
+  if (!url || !urls[url]) {
+    return [];
+  }
+
+  return [...new Set(Object.keys(urls).filter(Boolean))];
+}
+
+export function getSourceInSources(sources: SourcesMap, id: string): ?Source {
+  return sources[id];
+}
+
+export function getSources(state: OuterState) {
+  return state.sources.sources;
+}
+
+export function getUrls(state: OuterState) {
+  return state.sources.urls;
+}
+
+export function getSourceList(state: OuterState): Source[] {
+  return (Object.values(getSources(state)): any);
+}
+
+export const getSourceCount = createSelector(
+  getSources,
+  sources => Object.keys(sources).length
 );
 
 export const getSelectedLocation = createSelector(
@@ -363,22 +469,21 @@ export const getSelectedLocation = createSelector(
 export const getSelectedSource = createSelector(
   getSelectedLocation,
   getSources,
-  (selectedLocation, sources) => {
+  (selectedLocation: ?Location, sources: SourcesMap): ?Source => {
     if (!selectedLocation) {
       return;
     }
 
-    return sources.get(selectedLocation.sourceId);
+    return sources[selectedLocation.sourceId];
   }
 );
 
-export const getSelectedSourceText = createSelector(
-  getSelectedSource,
-  getSourcesState,
-  (selectedSource, sources) => {
-    const id = selectedSource.get("id");
-    return id ? sources.sourcesText.get(id) : null;
-  }
-);
+export function getProjectDirectoryRoot(state: OuterState): string {
+  return state.sources.projectDirectoryRoot;
+}
+
+export function getRelativeSources(state: OuterState): SourcesMap {
+  return state.sources.relativeSources;
+}
 
 export default update;

@@ -7,10 +7,11 @@
 * [global node packages](#global-packages)
 * [firefox plugin](#firefox-plugin)
 * [windows / linux](#windows--linux)
+* [Competing scripts](#competing-scripts)
 
 We do our best to have a 3 step / 1 minute install process,
 but we use bleeding edge technology and problems do arise. Here are our
-most seen issues. Please stop by and ask us a question in [slack],
+most seen issues. Please stop by and ask us a question in [Slack][slack],
 that's what we're here for!
 
 ### Node
@@ -42,7 +43,7 @@ npm globally: `npm i -g yarn@0.28.4`. and check the version with `which yarn` an
 
 ### Repo
 
-The most common issue is an out of date repo. The first thing to check is if your master branch is uptodate:
+The most common issue is an out of date repo. The first thing to check is if your master branch is up-to-date:
 `git log`. Once your branch is up to date, it is still possible that your packages are out of date.
 It is always a good practice to run `yarn nom` when something goes wrong.
 The script will rm your `yarn.lock` file and `node_modules` directory.
@@ -82,9 +83,13 @@ Try disabling your plugins in firefox and see if that helps.
 ### Windows / Linux
 
 We try our best to provide a consistent cross-platform experience, but there are still
-issues that come up w/ with Windows or Linux. If that happens for you, find us in [slack]
+issues that come up w/ with Windows or Linux. If that happens for you, find us in [Slack][slack]
 and someone will help you out :)
 
 [slack]:https://devtools-html-slack.herokuapp.com/
 [nvm]:https://github.com/creationix/nvm
 [yarn]:https://yarnpkg.com/en/
+
+### Competing Scripts
+
+If you are reloading the launchpad and not seeing the bundle change, it's possible that you are running `yarn start` and `yarn watch` at the same time. The best thing to do is to `<ctrl>-c` and close all the running programs, and run `ps` to make sure everything has stopped. At that point, try running `yarn start`, making a change in a src file and checking `localhost:8000/assets/build/debugger.js`.

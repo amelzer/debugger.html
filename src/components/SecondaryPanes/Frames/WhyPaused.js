@@ -1,48 +1,46 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 import React from "react";
-import { isString } from "lodash";
-import { get } from "lodash";
 
 import { getPauseReason } from "../../../utils/pause";
-import type { Pause } from "debugger-html";
+import type { Grip, ExceptionReason } from "../../../types";
 
 import "./WhyPaused.css";
 
-function renderExceptionSummary(exception) {
-  if (isString(exception)) {
+function renderExceptionSummary(exception: string | Grip) {
+  if (typeof exception === "string") {
     return exception;
   }
 
-  const message = get(exception, "preview.message");
-  const name = get(exception, "preview.name");
+  const preview = exception.preview;
+  if (!preview || !preview.name || !preview.message) {
+    return;
+  }
 
-  return `${name}: ${message}`;
+  return `${preview.name}: ${preview.message}`;
 }
 
-function renderMessage(pauseInfo: Pause) {
-  if (!pauseInfo) {
-    return null;
-  }
-
-  const message = get(pauseInfo, "why.message");
-  if (message) {
-    return <div className={"message"}>{message}</div>;
-  }
-
-  const exception = get(pauseInfo, "why.exception");
-  if (exception) {
+function renderMessage(why: ExceptionReason) {
+  if (why.type == "exception" && why.exception) {
     return (
       <div className={"message warning"}>
-        {renderExceptionSummary(exception)}
+        {renderExceptionSummary(why.exception)}
       </div>
     );
+  }
+
+  if (typeof why.message == "string") {
+    return <div className={"message"}>{why.message}</div>;
   }
 
   return null;
 }
 
-export default function renderWhyPaused({ pause }: { pause: Pause }) {
-  const reason = getPauseReason(pause);
+export default function renderWhyPaused(why: Object) {
+  const reason = getPauseReason(why);
 
   if (!reason) {
     return null;
@@ -51,7 +49,7 @@ export default function renderWhyPaused({ pause }: { pause: Pause }) {
   return (
     <div className={"pane why-paused"}>
       <div>{L10N.getStr(reason)}</div>
-      {renderMessage(pause)}
+      {renderMessage(why)}
     </div>
   );
 }

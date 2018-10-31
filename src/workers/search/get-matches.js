@@ -1,4 +1,9 @@
-import buildQuery from "./build-query";
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
+import assert from "../../utils/assert";
+import buildQuery from "../../utils/build-query";
 
 export default function getMatches(
   query: string,
@@ -18,6 +23,17 @@ export default function getMatches(
     const line = lines[i];
     while ((singleMatch = regexQuery.exec(line)) !== null) {
       matchedLocations.push({ line: i, ch: singleMatch.index });
+
+      // When the match is an empty string the regexQuery.lastIndex will not
+      // change resulting in an infinite loop so we need to check for this and
+      // increment it manually in that case.  See issue #7023
+      if (singleMatch[0] === "") {
+        assert(
+          !regexQuery.unicode,
+          "lastIndex++ can cause issues in unicode mode"
+        );
+        regexQuery.lastIndex++;
+      }
     }
   }
   return matchedLocations;

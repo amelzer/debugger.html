@@ -5,7 +5,9 @@
     "mozilla",
     "flowtype",
     "babel",
-    "prettier"
+    "prettier",
+    "import",
+    "file-header"
   ],
   "globals": {
     "atob": true,
@@ -35,7 +37,8 @@
   "extends": [
     "prettier",
     "prettier/flowtype",
-    "prettier/react"
+    "prettier/react",
+    "plugin:jest/recommended"
   ],
   "parserOptions": {
     "ecmaVersion": 2016,
@@ -43,10 +46,10 @@
     "ecmaFeatures": { "jsx": true }
   },
   "env": {
-      "es6": true,
-      "browser": true,
-      "commonjs": true,
-      "jest": true
+    "es6": true,
+    "browser": true,
+    "commonjs": true,
+    "jest": true
   },
   "rules": {
     // These are the rules that have been configured so far to match the
@@ -68,19 +71,26 @@
     "react/no-direct-mutation-state": 1,
     "react/no-unknown-property": 1,
     "react/prop-types": 1,
-    "react/sort-comp": [1, {
-      order: [
-        "propTypes",
-        "everything-else",
-        "render"
-      ]
-    }],
+    "react/sort-comp": [
+      1,
+      {
+        order: ["propTypes", "everything-else", "render"]
+      }
+    ],
+
+    // Check for import errors.
+    "import/no-duplicates": "error",
+    "import/named": "error",
+    "import/export": "error",
 
     // Enforce the spacing around the * in generator functions.
-    "babel/generator-star-spacing":  [2, "after"],
+    "generator-star-spacing": [2, "after"],
 
     "flowtype/define-flow-type": 1,
     "flowtype/use-flow-type": 1,
+
+    // Disallow flow control that escapes from "finally".
+    "no-unsafe-finally": "error",
 
     // Disallow using variables outside the blocks they are defined (especially
     // since only let and const are used, see "no-var").
@@ -91,7 +101,7 @@
     // impair readability, but also not required either.
     "comma-dangle": 0,
     // Warn about cyclomatic complexity in functions.
-    "complexity": 2,
+    "complexity": ["error", { "max": 22 }],
     // Don't warn for inconsistent naming when capturing this (not so important
     // with auto-binding fat arrow functions).
     "consistent-this": 0,
@@ -125,9 +135,17 @@
     // rule is a better rule to check this.
     "max-depth": 0,
     // Maximum length of a line.
-    "max-len": [2, 80, 2, {"ignoreUrls": true, "ignorePattern": "\\s*require\\s*\\(|^\\s*loader\\.lazy|-\\*-"}],
+    "max-len": [
+      2,
+      80,
+      2,
+      {
+        "ignoreUrls": true,
+        "ignorePattern": "\\s*require\\s*\\(|^\\s*loader\\.lazy|-\\*-"
+      }
+    ],
     // Maximum depth callbacks can be nested.
-    "max-nested-callbacks": [2, 3],
+    "max-nested-callbacks": [2, 4],
     // Don't limit the number of parameters that can be used in a function.
     "max-params": 0,
     // Don't limit the maximum number of statement allowed in a function. We
@@ -136,7 +154,7 @@
     // Require a capital letter for constructors, only check if all new
     // operators are followed by a capital letter. Don't warn when capitalized
     // functions are used without the new operator.
-    "new-cap": [2, {"capIsNew": false}],
+    "new-cap": [2, { "capIsNew": false }],
     // Disallow use of the Array constructor.
     "no-array-constructor": 2,
     // Allow use of bitwise operators.
@@ -211,10 +229,13 @@
     // Disallow use of multiline strings (use template strings instead).
     "no-multi-str": 2,
     "prefer-template": "error",
-    "prefer-const": ["error", {
-      "destructuring": "all",
-      "ignoreReadBeforeAssign": false
-    }],
+    "prefer-const": [
+      "error",
+      {
+        "destructuring": "all",
+        "ignoreReadBeforeAssign": false
+      }
+    ],
     // Disallow reassignments of native objects.
     "no-native-reassign": 2,
     // Disallow nested ternary expressions, they make the code hard to read.
@@ -287,7 +308,7 @@
     // statement.
     "no-unreachable": 2,
     // Disallow global and local variables that arent used, but allow unused function arguments.
-    "no-unused-vars": [2, {"vars": "all", "args": "none"}],
+    "no-unused-vars": [2, { "vars": "all", "args": "none" }],
     // Allow using variables before they are defined.
     "no-use-before-define": 0,
     // We use var-only-at-top-level instead of no-var as we allow top level
@@ -410,6 +431,17 @@
     "operator-linebreak": 0,
 
     // Rules from the prettier plugin
-    "prettier/prettier": "error"
+    "prettier/prettier": "error",
+
+    "file-header/file-header": [
+      "error",
+      [
+        "This Source Code Form is subject to the terms of the Mozilla Public",
+        "License, v. 2.0. If a copy of the MPL was not distributed with this",
+        "file, You can obtain one at <http://mozilla.org/MPL/2.0/>."
+      ],
+      "block",
+      ["-\\*-(.*)-\\*-", "eslint(.*)", "vim(.*)"]
+    ]
   }
 }

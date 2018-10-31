@@ -1,75 +1,81 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
 import {
   getSource,
+  getSourceFromId,
   hasSymbols,
   getSelectedLocation,
-  getSelectedSource,
-  getSelectedFrame,
-  getPreview
+  isPaused
 } from "../selectors";
 
-import { getMappedExpression } from "./expressions";
-import { PROMISE } from "../utils/redux/middleware/promise";
+import { mapFrames, fetchExtra } from "./pause";
+import { updateTab } from "./tabs";
+
+import { setInScopeLines } from "./ast/setInScopeLines";
 import {
   getSymbols,
-  getEmptyLines,
-  getOutOfScopeLocations
+  findOutOfScopeLocations,
+  getFramework,
+  getPausePoints,
+  type AstPosition
 } from "../workers/parser";
 
-import { findBestMatchExpression } from "../utils/ast";
+import { PROMISE } from "./utils/middleware/promise";
+import { features } from "../utils/prefs";
+import { isLoaded, isGenerated } from "../utils/source";
 
-import { isGeneratedId } from "devtools-source-map";
+import type { SourceId } from "../types";
+import type { ThunkArgs, Action } from "./types";
 
-import type { SourceId } from "debugger-html";
-import type { ThunkArgs } from "./types";
-import type { AstLocation } from "../workers/parser";
-
-const extraProps = {
-  react: { displayName: "this._reactInternalInstance.getName()" }
-};
-
-export function setSymbols(sourceId: SourceId) {
+export function setSourceMetaData(sourceId: SourceId) {
   return async ({ dispatch, getState }: ThunkArgs) => {
-    const sourceRecord = getSource(getState(), sourceId);
-    if (!sourceRecord) {
+    const source = getSource(getState(), sourceId);
+    if (!source || !isLoaded(source) || source.isWasm) {
       return;
     }
 
-    const source = sourceRecord.toJS();
-    if (!source.text || source.isWasm || hasSymbols(getState(), source)) {
-      return;
+    const framework = await getFramework(source.id);
+    if (framework) {
+      dispatch(updateTab(source, framework));
     }
 
-    const symbols = await getSymbols(source);
-
-    dispatch({
-      type: "SET_SYMBOLS",
-      source,
-      symbols
-    });
+    dispatch(
+      ({
+        type: "SET_SOURCE_METADATA",
+        sourceId: source.id,
+        sourceMetaData: {
+          framework
+        }
+      }: Action)
+    );
   };
 }
 
-export function setEmptyLines(sourceId: SourceId) {
+export function setSymbols(sourceId: SourceId) {
   return async ({ dispatch, getState }: ThunkArgs) => {
-    const sourceRecord = getSource(getState(), sourceId);
-    if (!sourceRecord) {
+    const source = getSourceFromId(getState(), sourceId);
+
+    if (source.isWasm || hasSymbols(getState(), source) || !isLoaded(source)) {
       return;
     }
 
-    const source = sourceRecord.toJS();
-    if (!source.text || source.isWasm) {
-      return;
-    }
-
-    const emptyLines = await getEmptyLines(source);
-
-    dispatch({
-      type: "SET_EMPTY_LINES",
-      source,
-      emptyLines
+    await dispatch({
+      type: "SET_SYMBOLS",
+      sourceId,
+      [PROMISE]: getSymbols(sourceId)
     });
+
+    if (isPaused(getState())) {
+      await dispatch(fetchExtra());
+      await dispatch(mapFrames());
+    }
+
+    await dispatch(setPausePoints(sourceId));
+    await dispatch(setSourceMetaData(sourceId));
   };
 }
 
@@ -80,101 +86,64 @@ export function setOutOfScopeLocations() {
       return;
     }
 
-    const source = getSource(getState(), location.sourceId);
+    const source = getSourceFromId(getState(), location.sourceId);
 
-    if (!location.line || !source) {
-      return dispatch({
+    let locations = null;
+    if (location.line && source && !source.isWasm && isPaused(getState())) {
+      locations = await findOutOfScopeLocations(
+        source.id,
+        ((location: any): AstPosition)
+      );
+    }
+
+    dispatch(
+      ({
         type: "OUT_OF_SCOPE_LOCATIONS",
-        locations: null
-      });
-    }
-
-    const locations = await getOutOfScopeLocations(source.toJS(), location);
-
-    return dispatch({
-      type: "OUT_OF_SCOPE_LOCATIONS",
-      locations
-    });
+        locations
+      }: Action)
+    );
+    dispatch(setInScopeLines());
   };
 }
 
-export function clearPreview() {
-  return ({ dispatch, getState, client }: ThunkArgs) => {
-    const currentSelection = getPreview(getState());
-    if (!currentSelection) {
-      return;
+function compressPausePoints(pausePoints) {
+  const compressed = {};
+  for (const line in pausePoints) {
+    compressed[line] = {};
+    for (const col in pausePoints[line]) {
+      const point = pausePoints[line][col];
+      compressed[line][col] = (point.break ? 1 : 0) | (point.step ? 2 : 0);
     }
+  }
 
-    return dispatch({
-      type: "CLEAR_SELECTION"
-    });
-  };
+  return compressed;
 }
 
-export function setPreview(
-  token: string,
-  tokenPos: AstLocation,
-  cursorPos: any
-) {
-  return async ({ dispatch, getState, client, sourceMaps }: ThunkArgs) => {
-    const currentSelection = getPreview(getState());
-    if (currentSelection && currentSelection.updating) {
+export function setPausePoints(sourceId: SourceId) {
+  return async ({ dispatch, getState, client }: ThunkArgs) => {
+    const source = getSourceFromId(getState(), sourceId);
+    if (!features.pausePoints || !source || !source.text) {
       return;
     }
 
-    await dispatch({
-      type: "SET_PREVIEW",
-      [PROMISE]: (async function() {
-        const source = getSelectedSource(getState());
-        const _symbols = await getSymbols(source.toJS());
+    if (source.isWasm) {
+      return;
+    }
 
-        const found = findBestMatchExpression(_symbols, tokenPos, token);
-        if (!found) {
-          return;
-        }
+    const pausePoints = await getPausePoints(sourceId);
+    const compressed = compressPausePoints(pausePoints);
 
-        let { expression, location } = found;
+    if (isGenerated(source)) {
+      await client.setPausePoints(sourceId, compressed);
+    }
 
-        if (!expression) {
-          return;
-        }
-
-        const sourceId = source.get("id");
-        if (location && !isGeneratedId(sourceId)) {
-          const generatedLocation = await sourceMaps.getGeneratedLocation(
-            { ...location.start, sourceId },
-            source.toJS()
-          );
-
-          expression = await getMappedExpression(
-            { sourceMaps },
-            generatedLocation,
-            expression
-          );
-        }
-
-        const selectedFrame = getSelectedFrame(getState());
-        const { result } = await client.evaluate(expression, {
-          frameId: selectedFrame.id
-        });
-
-        const data = await client.evaluate(extraProps.react.displayName, {
-          frameId: selectedFrame.id
-        });
-
-        if (result === undefined) {
-          return;
-        }
-
-        return {
-          expression,
-          result,
-          location,
-          tokenPos,
-          cursorPos,
-          extra: data && data.result
-        };
-      })()
-    });
+    dispatch(
+      ({
+        type: "SET_PAUSE_POINTS",
+        sourceText: source.text || "",
+        sourceId,
+        pausePoints
+      }: Action)
+    );
   };
 }

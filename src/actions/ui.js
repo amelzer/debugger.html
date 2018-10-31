@@ -1,6 +1,22 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
-import { getSource, getActiveSearch } from "../selectors";
-import type { ThunkArgs } from "./types";
+
+import {
+  getActiveSearch,
+  getPaneCollapse,
+  getQuickOpenEnabled,
+  getSource,
+  getFileSearchQuery,
+  getProjectDirectoryRoot
+} from "../selectors";
+import { selectSource } from "../actions/sources/select";
+import type { ThunkArgs, panelPositionType } from "./types";
+import { getEditor } from "../utils/editor";
+import { searchContents } from "./file-search";
+
 import type {
   ActiveSearchType,
   OrientationType,
@@ -31,10 +47,25 @@ export function setActiveSearch(activeSearch?: ActiveSearchType) {
       return;
     }
 
+    if (getQuickOpenEnabled(getState())) {
+      dispatch({ type: "CLOSE_QUICK_OPEN" });
+    }
+
     dispatch({
       type: "TOGGLE_ACTIVE_SEARCH",
       value: activeSearch
     });
+  };
+}
+
+export function updateActiveFileSearch() {
+  return ({ dispatch, getState }: ThunkArgs) => {
+    const isFileSearchOpen = getActiveSearch(getState()) === "file";
+    const fileSearchQuery = getFileSearchQuery(getState());
+    if (isFileSearchOpen && fileSearchQuery) {
+      const editor = getEditor();
+      dispatch(searchContents(fileSearchQuery, editor));
+    }
   };
 }
 
@@ -50,25 +81,41 @@ export function toggleFrameworkGrouping(toggleValue: boolean) {
 export function showSource(sourceId: string) {
   return ({ dispatch, getState }: ThunkArgs) => {
     const source = getSource(getState(), sourceId);
+    if (!source) {
+      return;
+    }
+
+    if (getPaneCollapse(getState(), "start")) {
+      dispatch({
+        type: "TOGGLE_PANE",
+        position: "start",
+        paneCollapsed: false
+      });
+    }
 
     dispatch(setPrimaryPaneTab("sources"));
-    dispatch({
-      type: "SHOW_SOURCE",
-      sourceUrl: ""
-    });
 
-    dispatch({
-      type: "SHOW_SOURCE",
-      sourceUrl: source.get("url")
-    });
+    dispatch({ type: "SHOW_SOURCE", source: null });
+    dispatch(selectSource(source.id));
+    dispatch({ type: "SHOW_SOURCE", source });
   };
 }
 
-export function togglePaneCollapse(position: string, paneCollapsed: boolean) {
-  return {
-    type: "TOGGLE_PANE",
-    position,
-    paneCollapsed
+export function togglePaneCollapse(
+  position: panelPositionType,
+  paneCollapsed: boolean
+) {
+  return ({ dispatch, getState }: ThunkArgs) => {
+    const prevPaneCollapse = getPaneCollapse(getState(), position);
+    if (prevPaneCollapse === paneCollapsed) {
+      return;
+    }
+
+    dispatch({
+      type: "TOGGLE_PANE",
+      position,
+      paneCollapsed
+    });
   };
 }
 
@@ -87,6 +134,17 @@ export function highlightLineRange(location: {
   };
 }
 
+export function flashLineRange(location: {
+  start: number,
+  end: number,
+  sourceId: number
+}) {
+  return ({ dispatch }: ThunkArgs) => {
+    dispatch(highlightLineRange(location));
+    setTimeout(() => dispatch(clearHighlightLineRange()), 200);
+  };
+}
+
 /**
  * @memberof actions/sources
  * @static
@@ -97,10 +155,14 @@ export function clearHighlightLineRange() {
   };
 }
 
-export function openConditionalPanel(line?: number) {
+export function openConditionalPanel(line: ?number) {
+  if (!line) {
+    return;
+  }
+
   return {
     type: "OPEN_CONDITIONAL_PANEL",
-    line: line
+    line
   };
 }
 
@@ -110,10 +172,32 @@ export function closeConditionalPanel() {
   };
 }
 
-export function setProjectDirectoryRoot(url: Object) {
+export function clearProjectDirectoryRoot() {
   return {
     type: "SET_PROJECT_DIRECTORY_ROOT",
-    url
+    url: ""
+  };
+}
+
+export function setProjectDirectoryRoot(newRoot: string) {
+  return ({ dispatch, getState }: ThunkArgs) => {
+    const curRoot = getProjectDirectoryRoot(getState());
+    if (newRoot && curRoot) {
+      const newRootArr = newRoot.replace(/\/+/g, "/").split("/");
+      const curRootArr = curRoot
+        .replace(/^\//, "")
+        .replace(/\/+/g, "/")
+        .split("/");
+      if (newRootArr[0] !== curRootArr[0]) {
+        newRootArr.splice(0, 2);
+        newRoot = `${curRoot}/${newRootArr.join("/")}`;
+      }
+    }
+
+    dispatch({
+      type: "SET_PROJECT_DIRECTORY_ROOT",
+      url: newRoot
+    });
   };
 }
 

@@ -1,6 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
 /**
  * Quick Open reducer
@@ -25,14 +25,14 @@ type QuickOpenState = {
   searchType: QuickOpenType
 };
 
-export const State = makeRecord({
+export const createQuickOpenState = makeRecord({
   enabled: false,
   query: "",
   searchType: "sources"
 });
 
 export default function update(
-  state: Record<QuickOpenState> = State(),
+  state: Record<QuickOpenState> = createQuickOpenState(),
   action: Action
 ): Record<QuickOpenState> {
   switch (action.type) {
@@ -46,7 +46,7 @@ export default function update(
       }
       return state.set("enabled", true);
     case "CLOSE_QUICK_OPEN":
-      return State();
+      return createQuickOpenState();
     case "SET_QUICK_OPEN_QUERY":
       return state.merge({
         query: action.query,

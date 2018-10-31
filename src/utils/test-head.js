@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
 /**
@@ -9,9 +13,9 @@ import { combineReducers } from "redux";
 import sourceMaps from "devtools-source-map";
 import reducers from "../reducers";
 import actions from "../actions";
-import selectors from "../selectors";
+import * as selectors from "../selectors";
 import { getHistory } from "../test/utils/history";
-import configureStore from "../utils/create-store";
+import configureStore from "../actions/utils/create-store";
 
 /**
  * @memberof utils/test-head
@@ -22,10 +26,11 @@ function createStore(client: any, initialState: any = {}, sourceMapsMock: any) {
     log: false,
     history: getHistory(),
     makeThunkArgs: args => {
-      return Object.assign({}, args, {
+      return {
+        ...args,
         client,
-        sourceMaps: sourceMapsMock || sourceMaps
-      });
+        sourceMaps: sourceMapsMock !== undefined ? sourceMapsMock : sourceMaps
+      };
     }
   })(combineReducers(reducers), initialState);
 }
@@ -38,34 +43,58 @@ function commonLog(msg: string, data: any = {}) {
   console.log(`[INFO] ${msg} ${JSON.stringify(data)}`);
 }
 
+function makeFrame({ id, sourceId }: Object, opts: Object = {}) {
+  return {
+    id,
+    scope: { bindings: { variables: {}, arguments: [] } },
+    location: { sourceId, line: 4 },
+    ...opts
+  };
+}
+
 /**
  * @memberof utils/test-head
  * @static
  */
 function makeSource(name: string, props: any = {}) {
-  return Object.assign(
-    {
-      id: name,
-      loadedState: "loaded",
-      url: `http://localhost:8000/examples/${name}`
-    },
-    props
-  );
+  return {
+    id: name,
+    loadedState: "unloaded",
+    url: `http://localhost:8000/examples/${name}`,
+    ...props
+  };
 }
 
-function makeFuncLocation(startLine) {
+function makeOriginalSource(name: string, props?: Object) {
+  const source = makeSource(name, props);
+  return { ...source, id: `${name}/originalSource` };
+}
+
+function makeFuncLocation(startLine, endLine) {
+  if (!endLine) {
+    endLine = startLine + 1;
+  }
   return {
     start: {
       line: startLine
+    },
+    end: {
+      line: endLine
     }
   };
 }
 
-function makeSymbolDeclaration(name: string, line: number) {
+function makeSymbolDeclaration(
+  name: string,
+  start: number,
+  end: number,
+  klass: string
+) {
   return {
-    id: `${name}:${line}`,
+    id: `${name}:${start}`,
     name,
-    location: makeFuncLocation(line)
+    location: makeFuncLocation(start, end),
+    klass
   };
 }
 
@@ -73,15 +102,25 @@ function makeSymbolDeclaration(name: string, line: number) {
  * @memberof utils/test-head
  * @static
  */
-function waitForState(store: any, predicate: any) {
+function waitForState(store: any, predicate: any): Promise<void> {
   return new Promise(resolve => {
+    let ret = predicate(store.getState());
+    if (ret) {
+      resolve(ret);
+    }
+
     const unsubscribe = store.subscribe(() => {
-      if (predicate(store.getState())) {
+      ret = predicate(store.getState());
+      if (ret) {
         unsubscribe();
-        resolve();
+        resolve(ret);
       }
     });
   });
+}
+
+function getTelemetryEvents(eventName: string) {
+  return window.dbg._telemetry.events[eventName] || [];
 }
 
 export {
@@ -90,7 +129,10 @@ export {
   reducers,
   createStore,
   commonLog,
+  getTelemetryEvents,
+  makeFrame,
   makeSource,
+  makeOriginalSource,
   makeSymbolDeclaration,
   waitForState,
   getHistory

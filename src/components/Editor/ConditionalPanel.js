@@ -1,9 +1,11 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 import React, { PureComponent } from "react";
 import ReactDOM from "react-dom";
-import { bindActionCreators } from "redux";
 import { connect } from "react-redux";
-import CloseButton from "../shared/Button/Close";
 import "./ConditionalPanel.css";
 import { toEditorLine } from "../../utils/editor";
 import actions from "../../actions";
@@ -15,7 +17,7 @@ import {
 } from "../../selectors";
 
 type Props = {
-  breakpoint: Object,
+  breakpoint: ?Object,
   selectedLocation: Object,
   setBreakpointCondition: Function,
   line: number,
@@ -27,6 +29,8 @@ type Props = {
 export class ConditionalPanel extends PureComponent<Props> {
   cbPanel: null | Object;
   input: ?HTMLInputElement;
+  panelNode: ?HTMLDivElement;
+  scrollParent: ?HTMLElement;
 
   constructor() {
     super();
@@ -67,6 +71,22 @@ export class ConditionalPanel extends PureComponent<Props> {
       this.cbPanel.clear();
       this.cbPanel = null;
     }
+    if (this.scrollParent) {
+      this.scrollParent.removeEventListener("scroll", this.repositionOnScroll);
+    }
+  }
+
+  repositionOnScroll = () => {
+    if (this.panelNode && this.scrollParent) {
+      const { scrollLeft } = this.scrollParent;
+      this.panelNode.style.transform = `translateX(${scrollLeft}px)`;
+    }
+  };
+
+  componentWillMount() {
+    if (this.props.line) {
+      return this.renderToWidget(this.props);
+    }
   }
 
   componentWillUpdate(nextProps: Props) {
@@ -76,7 +96,25 @@ export class ConditionalPanel extends PureComponent<Props> {
     return this.clearConditionalPanel();
   }
 
+  componentDidUpdate(prevProps: Props) {
+    this.keepFocusOnInput();
+  }
+
+  componentWillUnmount() {
+    // This is called if CodeMirror is re-initializing itself before the
+    // user closes the conditional panel. Clear the widget, and re-render it
+    // as soon as this component gets remounted
+    return this.clearConditionalPanel();
+  }
+
   renderToWidget(props: Props) {
+    if (this.cbPanel) {
+      if (this.props.line && this.props.line == props.line) {
+        return props.closeConditionalPanel();
+      }
+      this.clearConditionalPanel();
+    }
+
     const { selectedLocation, line, editor } = props;
     const sourceId = selectedLocation ? selectedLocation.sourceId : "";
 
@@ -90,7 +128,22 @@ export class ConditionalPanel extends PureComponent<Props> {
       }
     );
     if (this.input) {
-      this.input.focus();
+      let parent: ?Node = this.input.parentNode;
+      while (parent) {
+        if (
+          parent instanceof HTMLElement &&
+          parent.classList.contains("CodeMirror-scroll")
+        ) {
+          this.scrollParent = parent;
+          break;
+        }
+        parent = (parent.parentNode: ?Node);
+      }
+
+      if (this.scrollParent) {
+        this.scrollParent.addEventListener("scroll", this.repositionOnScroll);
+        this.repositionOnScroll();
+      }
     }
   }
 
@@ -103,18 +156,17 @@ export class ConditionalPanel extends PureComponent<Props> {
         className="conditional-breakpoint-panel"
         onClick={() => this.keepFocusOnInput()}
         onBlur={this.props.closeConditionalPanel}
+        ref={node => (this.panelNode = node)}
       >
         <div className="prompt">»</div>
         <input
           defaultValue={condition}
           placeholder={L10N.getStr("editor.conditionalPanel.placeholder")}
           onKeyDown={this.onKey}
-          ref={input => (this.input = input)}
-        />
-        <CloseButton
-          handleClick={this.props.closeConditionalPanel}
-          buttonClass="big"
-          tooltip={L10N.getStr("editor.conditionalPanel.close")}
+          ref={input => {
+            this.input = input;
+            this.keepFocusOnInput();
+          }}
         />
       </div>,
       panel
@@ -127,15 +179,30 @@ export class ConditionalPanel extends PureComponent<Props> {
   }
 }
 
+const mapStateToProps = state => {
+  const line = getConditionalPanelLine(state);
+  const selectedLocation = getSelectedLocation(state);
+
+  return {
+    selectedLocation,
+    breakpoint: getBreakpointForLine(state, selectedLocation.sourceId, line),
+    line
+  };
+};
+
+const {
+  setBreakpointCondition,
+  openConditionalPanel,
+  closeConditionalPanel
+} = actions;
+
+const mapDispatchToProps = {
+  setBreakpointCondition,
+  openConditionalPanel,
+  closeConditionalPanel
+};
+
 export default connect(
-  state => {
-    const line = getConditionalPanelLine(state);
-    const selectedLocation = getSelectedLocation(state);
-    return {
-      selectedLocation,
-      breakpoint: getBreakpointForLine(state, selectedLocation.sourceId, line),
-      line
-    };
-  },
-  dispatch => bindActionCreators(actions, dispatch)
+  mapStateToProps,
+  mapDispatchToProps
 )(ConditionalPanel);

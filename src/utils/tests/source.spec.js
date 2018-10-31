@@ -1,6 +1,12 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 import {
   getFilename,
+  getTruncatedFileName,
   getFileURL,
+  getDisplayPath,
   getMode,
   getSourceLineCount,
   isThirdParty,
@@ -8,6 +14,10 @@ import {
 } from "../source.js";
 
 describe("sources", () => {
+  const unicode = "\u6e2c";
+  const encodedUnicode = encodeURIComponent(unicode);
+  const punycode = "xn--g6w";
+
   describe("getFilename", () => {
     it("should give us a default of (index)", () => {
       expect(
@@ -22,14 +32,13 @@ describe("sources", () => {
         })
       ).toBe("hello.html");
     });
-    it("should truncate the file name when it is more than 50 chars", () => {
+    it("should give us the readable Unicode filename if encoded", () => {
       expect(
-        getFileURL({
-          url:
-            "http://localhost/really-really-really-really-really-really-long-name.html",
+        getFilename({
+          url: `http://localhost.com:7999/increment/${encodedUnicode}.html`,
           id: ""
         })
-      ).toBe("...-really-really-really-really-really-long-name.html");
+      ).toBe(`${unicode}.html`);
     });
     it("should give us the filename excluding the query strings", () => {
       expect(
@@ -38,6 +47,170 @@ describe("sources", () => {
           id: ""
         })
       ).toBe("hello.html");
+    });
+    it("should give us the proper filename for pretty files", () => {
+      expect(
+        getFilename({
+          url: "http://localhost.com:7999/increment/hello.html:formatted",
+          id: ""
+        })
+      ).toBe("hello.html");
+    });
+  });
+
+  describe("getTruncatedFileName", () => {
+    it("should truncate the file name when it is more than 30 chars", () => {
+      expect(
+        getTruncatedFileName(
+          {
+            url: "really-really-really-really-really-really-long-name.html",
+            id: ""
+          },
+          30
+        )
+      ).toBe("really-really…long-name.html");
+    });
+    it("should first decode the filename and then truncate it", () => {
+      expect(
+        getTruncatedFileName(
+          {
+            url: `${encodedUnicode.repeat(30)}.html`,
+            id: ""
+          },
+          30
+        )
+      ).toBe("測測測測測測測測測測測測測…測測測測測測測測測.html");
+    });
+  });
+
+  describe("getDisplayPath", () => {
+    it("should give us the path for files with same name", () => {
+      expect(
+        getDisplayPath(
+          {
+            url: "http://localhost.com:7999/increment/abc/hello.html",
+            id: ""
+          },
+          [
+            {
+              url: "http://localhost.com:7999/increment/xyz/hello.html",
+              id: ""
+            },
+            {
+              url: "http://localhost.com:7999/increment/abc/hello.html",
+              id: ""
+            },
+            {
+              url: "http://localhost.com:7999/increment/hello.html",
+              id: ""
+            }
+          ]
+        )
+      ).toBe("abc");
+    });
+
+    it(`should give us the path for files with same name
+      in directories with same name`, () => {
+      expect(
+        getDisplayPath(
+          {
+            url: "http://localhost.com:7999/increment/abc/web/hello.html",
+            id: ""
+          },
+          [
+            {
+              url: "http://localhost.com:7999/increment/xyz/web/hello.html",
+              id: ""
+            },
+            {
+              url: "http://localhost.com:7999/increment/abc/web/hello.html",
+              id: ""
+            },
+            {
+              url: "http://localhost.com:7999/increment/hello.html",
+              id: ""
+            }
+          ]
+        )
+      ).toBe("abc/web");
+    });
+
+    it("should give no path for files with unique name", () => {
+      expect(
+        getDisplayPath(
+          {
+            url: "http://localhost.com:7999/increment/abc/web.html",
+            id: ""
+          },
+          [
+            {
+              url: "http://localhost.com:7999/increment/xyz.html",
+              id: ""
+            },
+            {
+              url: "http://localhost.com:7999/increment/abc.html",
+              id: ""
+            },
+            {
+              url: "http://localhost.com:7999/increment/hello.html",
+              id: ""
+            }
+          ]
+        )
+      ).toBe(undefined);
+    });
+    it("should not show display path for pretty file", () => {
+      expect(
+        getDisplayPath(
+          {
+            url:
+              "http://localhost.com:7999/increment/abc/web/hello.html:formatted",
+            id: ""
+          },
+          [
+            {
+              url: "http://localhost.com:7999/increment/abc/web/hell.html",
+              id: ""
+            },
+            {
+              url: "http://localhost.com:7999/increment/abc/web/hello.html",
+              id: ""
+            },
+            {
+              url: "http://localhost.com:7999/increment/xyz.html:formatted",
+              id: ""
+            }
+          ]
+        )
+      ).toBe(undefined);
+    });
+    it(`should give us the path for files with same name when both
+      are pretty and different path`, () => {
+      expect(
+        getDisplayPath(
+          {
+            url:
+              "http://localhost.com:7999/increment/abc/web/hello.html:formatted",
+            id: ""
+          },
+          [
+            {
+              url:
+                "http://localhost.com:7999/increment/xyz/web/hello.html:formatted",
+              id: ""
+            },
+            {
+              url:
+                "http://localhost.com:7999/increment/abc/web/hello.html:formatted",
+              id: ""
+            },
+            {
+              url: "http://localhost.com:7999/increment/hello.html:formatted",
+              id: ""
+            }
+          ]
+        )
+      ).toBe("abc/web");
     });
   });
 
@@ -50,13 +223,29 @@ describe("sources", () => {
         })
       ).toBe("http://localhost.com:7999/increment/hello.html");
     });
+    it("should give us the readable Unicode file URL if encoded", () => {
+      expect(
+        getFileURL({
+          url: `http://${punycode}.${punycode}:7999/increment/${encodedUnicode}.html`,
+          id: ""
+        })
+      ).toBe(`http://${unicode}.${unicode}:7999/increment/${unicode}.html`);
+    });
     it("should truncate the file url when it is more than 50 chars", () => {
       expect(
         getFileURL({
           url: "http://localhost-long.com:7999/increment/hello.html",
           id: ""
         })
-      ).toBe("...ttp://localhost-long.com:7999/increment/hello.html");
+      ).toBe("…ttp://localhost-long.com:7999/increment/hello.html");
+    });
+    it("should first decode the file URL and then truncate it", () => {
+      expect(
+        getFileURL({
+          url: `http://${encodedUnicode.repeat(39)}.html`,
+          id: ""
+        })
+      ).toBe(`…ttp://${unicode.repeat(39)}.html`);
     });
   });
 
@@ -97,7 +286,7 @@ describe("sources", () => {
         text: "// @flow",
         url: ""
       };
-      expect(getMode(source).typescript).toBe(true);
+      expect(getMode(source)).toEqual({ name: "javascript", typescript: true });
     });
 
     it("/* @flow */", () => {
@@ -106,7 +295,7 @@ describe("sources", () => {
         text: "   /* @flow */",
         url: ""
       };
-      expect(getMode(source).typescript).toBe(true);
+      expect(getMode(source)).toEqual({ name: "javascript", typescript: true });
     });
 
     it("mixed html", () => {
@@ -124,16 +313,40 @@ describe("sources", () => {
         text: 'main = text "Hello, World!"',
         url: ""
       };
-      expect(getMode(source)).toBe("elm");
+      expect(getMode(source)).toEqual({ name: "elm" });
     });
 
-    it("jsx", () => {
+    it("returns jsx if contentType jsx is given", () => {
       const source = {
         contentType: "text/jsx",
         text: "<h1></h1>",
         url: ""
       };
-      expect(getMode(source)).toBe("jsx");
+      expect(getMode(source)).toEqual({ name: "jsx" });
+    });
+
+    it("returns jsx if sourceMetaData says it's a react component", () => {
+      const source = {
+        text: "<h1></h1>",
+        url: ""
+      };
+      expect(getMode(source, { hasJsx: true })).toEqual({ name: "jsx" });
+    });
+
+    it("returns jsx if the fileExtension is .jsx", () => {
+      const source = {
+        text: "<h1></h1>",
+        url: "myComponent.jsx"
+      };
+      expect(getMode(source)).toEqual({ name: "jsx" });
+    });
+
+    it("returns text/x-haxe if the file extension is .hx", () => {
+      const source = {
+        text: "function foo(){}",
+        url: "myComponent.hx"
+      };
+      expect(getMode(source)).toEqual({ name: "text/x-haxe" });
     });
 
     it("typescript", () => {
@@ -142,7 +355,7 @@ describe("sources", () => {
         text: "function foo(){}",
         url: ""
       };
-      expect(getMode(source).typescript).toBe(true);
+      expect(getMode(source)).toEqual({ name: "javascript", typescript: true });
     });
 
     it("typescript-jsx", () => {
@@ -151,6 +364,7 @@ describe("sources", () => {
         text: "<h1></h1>",
         url: ""
       };
+
       expect(getMode(source).base.typescript).toBe(true);
     });
 
@@ -160,7 +374,7 @@ describe("sources", () => {
         text: "(+ 2 3)",
         url: ""
       };
-      expect(getMode(source)).toBe("clojure");
+      expect(getMode(source)).toEqual({ name: "clojure" });
     });
 
     it("coffeescript", () => {
@@ -169,7 +383,7 @@ describe("sources", () => {
         text: "x = (a) -> 3",
         url: ""
       };
-      expect(getMode(source)).toBe("coffeescript");
+      expect(getMode(source)).toEqual({ name: "coffeescript" });
     });
 
     it("wasm", () => {

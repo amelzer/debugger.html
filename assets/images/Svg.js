@@ -1,23 +1,33 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 const React = require("react");
-const InlineSVG = require("svg-inline-react");
-const { isDevelopment } = require("devtools-config");
+import InlineSVG from "svg-inline-react";
 
 const svg = {
   "angle-brackets": require("./angle-brackets.svg"),
   angular: require("./angular.svg"),
   arrow: require("./arrow.svg"),
+  babel: require("./babel.svg"),
   backbone: require("./backbone.svg"),
   blackBox: require("./blackBox.svg"),
+  breadcrumb: require("./breadcrumbs-divider.svg"),
   breakpoint: require("./breakpoint.svg"),
   "column-breakpoint": require("./column-breakpoint.svg"),
+  "column-marker": require("./column-marker.svg"),
   "case-match": require("./case-match.svg"),
-  close: require("./close.svg"),
   choo: require("./choo.svg"),
+  close: require("./close.svg"),
+  coffeescript: require(`./coffeescript.svg`),
   dojo: require("./dojo.svg"),
   domain: require("./domain.svg"),
+  extension: require("./extension.svg"),
   file: require("./file.svg"),
   folder: require("./folder.svg"),
   globe: require("./globe.svg"),
+  home: require("./home.svg"),
+  javascript: require("./javascript.svg"),
   jquery: require("./jquery.svg"),
   underscore: require("./underscore.svg"),
   lodash: require("./lodash.svg"),
@@ -42,8 +52,10 @@ const svg = {
   stepOut: require("./stepOut.svg"),
   stepOver: require("./stepOver.svg"),
   subSettings: require("./subSettings.svg"),
+  tab: require("./tab.svg"),
   toggleBreakpoints: require("./toggle-breakpoints.svg"),
   togglePanes: require("./toggle-panes.svg"),
+  typescript: require("./typescript.svg"),
   "whole-word-match": require("./whole-word-match.svg"),
   worker: require("./worker.svg"),
   "sad-face": require("devtools-mc-assets/assets/devtools/client/themes/images/sad-face.svg"),
@@ -53,11 +65,14 @@ const svg = {
   express: require("./express.svg"),
   pug: require("./pug.svg"),
   extjs: require("./sencha-extjs.svg"),
+  mobx: require("./mobx.svg"),
   marko: require("./marko.svg"),
   nextjs: require("./nextjs.svg"),
   showSources: require("./showSources.svg"),
   showOutline: require("./showOutline.svg"),
-  nuxtjs: require("./nuxtjs.svg")
+  nuxtjs: require("./nuxtjs.svg"),
+  rxjs: require("./rxjs.svg"),
+  loader: require('./loader.svg')
 };
 
 type SvgType = {
@@ -70,12 +85,8 @@ type SvgType = {
 function Svg({ name, className, onClick, "aria-label": ariaLabel }) {
   if (!svg[name]) {
     const error = `Unknown SVG: ${name}`;
-    if (isDevelopment()) {
-      throw new Error(error);
-    }
-
     console.warn(error);
-    return;
+    return null;
   }
 
   className = `${name} ${className || ""}`;

@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 import { wrapExpression, sanitizeInput, getValue } from "../expressions";
 
 function createError(preview) {
@@ -30,8 +34,12 @@ describe("expressions", () => {
       expect(sanitizeInput('"3"')).toEqual('"3"');
     });
 
-    it("sanitizes forward slashes", () => {
-      expect(sanitizeInput("foo\\\\")).toEqual("foo\\\\\\\\");
+    it("evaluates \\u{61} as a", () => {
+      expect(sanitizeInput("\u{61}")).toEqual("a");
+    });
+
+    it("evaluates N\\u{61}N as NaN", () => {
+      expect(sanitizeInput("N\u{61}N")).toEqual("NaN");
     });
   });
 

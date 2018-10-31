@@ -1,39 +1,82 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
-import { isEnabled } from "devtools-config";
-import * as sourceDocumentUtils from "./source-documents";
-import { shouldPrettyPrint } from "../../utils/source";
+export * from "./source-documents";
+export * from "./get-token-location";
+export * from "./source-search";
+export * from "../ui";
+export { onMouseOver } from "./token-events";
 
-import * as expressionUtils from "./expression.js";
-
-import * as sourceSearchUtils from "./source-search";
-const { findNext, findPrev } = sourceSearchUtils;
+import { createEditor } from "./create-editor";
+import { shouldPrettyPrint, isOriginal } from "../source";
+import { findNext, findPrev } from "./source-search";
 
 import { isWasm, lineToWasmOffset, wasmOffsetToLine } from "../wasm";
 
-import { SourceEditor, SourceEditorUtils } from "devtools-source-editor";
-
-import type { AstPosition, AstLocation } from "../../workers/parser/types";
+import type { AstLocation } from "../../workers/parser";
 import type { EditorPosition, EditorRange } from "../editor/types";
+import type { Location } from "../../types";
+type Editor = Object;
 
-function shouldShowPrettyPrint(selectedSource) {
+let editor: ?Editor;
+
+export function getEditor() {
+  if (editor) {
+    return editor;
+  }
+
+  editor = createEditor();
+  return editor;
+}
+
+export function removeEditor() {
+  editor = null;
+}
+
+function getCodeMirror() {
+  return editor && editor.codeMirror;
+}
+
+export function startOperation() {
+  const codeMirror = getCodeMirror();
+  if (!codeMirror) {
+    return;
+  }
+
+  codeMirror.startOperation();
+}
+
+export function endOperation() {
+  const codeMirror = getCodeMirror();
+  if (!codeMirror) {
+    return;
+  }
+
+  codeMirror.endOperation();
+}
+
+export function shouldShowPrettyPrint(selectedSource) {
   if (!selectedSource) {
     return false;
   }
 
-  selectedSource = selectedSource.toJS();
   return shouldPrettyPrint(selectedSource);
 }
 
-function shouldShowFooter(selectedSource, horizontal) {
+export function shouldShowFooter(selectedSource, horizontal) {
   if (!horizontal) {
     return true;
   }
-
-  return shouldShowPrettyPrint(selectedSource);
+  if (!selectedSource) {
+    return false;
+  }
+  return shouldShowPrettyPrint(selectedSource) || isOriginal(selectedSource);
 }
 
-function traverseResults(e, ctx, query, dir, modifiers) {
+export function traverseResults(e, ctx, query, dir, modifiers) {
   e.stopPropagation();
   e.preventDefault();
 
@@ -44,102 +87,96 @@ function traverseResults(e, ctx, query, dir, modifiers) {
   }
 }
 
-function createEditor() {
-  const gutters = ["breakpoints", "hit-markers", "CodeMirror-linenumbers"];
-
-  if (isEnabled("codeFolding")) {
-    gutters.push("CodeMirror-foldgutter");
+export function toEditorLine(sourceId: string, lineOrOffset: number): number {
+  if (isWasm(sourceId)) {
+    // TODO ensure offset is always "mappable" to edit line.
+    return wasmOffsetToLine(sourceId, lineOrOffset) || 0;
   }
 
-  return new SourceEditor({
-    mode: "javascript",
-    foldGutter: isEnabled("codeFolding"),
-    enableCodeFolding: isEnabled("codeFolding"),
-    readOnly: true,
-    lineNumbers: true,
-    theme: "mozilla",
-    styleActiveLine: false,
-    lineWrapping: false,
-    matchBrackets: true,
-    showAnnotationRuler: true,
-    gutters,
-    value: " ",
-    extraKeys: {
-      // Override code mirror keymap to avoid conflicts with split console.
-      Esc: false,
-      "Cmd-F": false,
-      "Cmd-G": false
-    }
-  });
+  return lineOrOffset ? lineOrOffset - 1 : 1;
 }
 
-function toEditorLine(sourceId: string, lineOrOffset: number): ?number {
-  return isWasm(sourceId)
-    ? wasmOffsetToLine(sourceId, lineOrOffset)
-    : lineOrOffset - 1;
-}
-
-function toEditorPosition(
-  sourceId: string,
-  location: AstPosition
-): EditorPosition {
+export function toEditorPosition(location: Location): EditorPosition {
   return {
-    line: toEditorLine(sourceId, location.line),
-    column: isWasm(sourceId) ? 0 : location.column
+    line: toEditorLine(location.sourceId, location.line),
+    column: isWasm(location.sourceId) || !location.column ? 0 : location.column
   };
 }
 
-function toEditorRange(sourceId: string, location: AstLocation): EditorRange {
+export function toEditorRange(
+  sourceId: string,
+  location: AstLocation
+): EditorRange {
   const { start, end } = location;
   return {
-    start: toEditorPosition(sourceId, start),
-    end: toEditorPosition(sourceId, end)
+    start: toEditorPosition({ ...start, sourceId }),
+    end: toEditorPosition({ ...end, sourceId })
   };
 }
 
-function toSourceLine(sourceId: string, line: number): ?number {
+export function toSourceLine(sourceId: string, line: number): ?number {
   return isWasm(sourceId) ? lineToWasmOffset(sourceId, line) : line + 1;
 }
 
-function scrollToColumn(codeMirror: any, line: number, column: number) {
+export function scrollToColumn(codeMirror: any, line: number, column: number) {
   const { top, left } = codeMirror.charCoords(
     { line: line, ch: column },
     "local"
   );
 
-  const centeredX = left - codeMirror.getScrollerElement().offsetWidth / 2;
-  const centeredY = top - codeMirror.getScrollerElement().offsetHeight / 2;
+  if (!isVisible(codeMirror, top, left)) {
+    const scroller = codeMirror.getScrollerElement();
+    const centeredX = Math.max(left - scroller.offsetWidth / 2, 0);
+    const centeredY = Math.max(top - scroller.offsetHeight / 2, 0);
 
-  codeMirror.scrollTo(centeredX, centeredY);
+    codeMirror.scrollTo(centeredX, centeredY);
+  }
 }
 
-function toSourceLocation(
-  sourceId: string,
-  location: EditorPosition
-): AstPosition {
-  return {
-    line: toSourceLine(sourceId, location.line),
-    column: isWasm(sourceId) ? undefined : location.column
-  };
+function isVisible(codeMirror: any, top: number, left: number) {
+  function withinBounds(x, min, max) {
+    return x >= min && x <= max;
+  }
+
+  const scrollArea = codeMirror.getScrollInfo();
+  const charWidth = codeMirror.defaultCharWidth();
+  const fontHeight = codeMirror.defaultTextHeight();
+  const { scrollTop, scrollLeft } = codeMirror.doc;
+
+  const inXView = withinBounds(
+    left,
+    scrollLeft,
+    scrollLeft + (scrollArea.clientWidth - 30) - charWidth
+  );
+
+  const inYView = withinBounds(
+    top,
+    scrollTop,
+    scrollTop + scrollArea.clientHeight - fontHeight
+  );
+
+  return inXView && inYView;
 }
 
-function markText(editor: any, className, location: EditorRange) {
-  const { start, end } = location;
-
-  return editor.codeMirror.markText(
+export function markText(_editor: any, className, { start, end }: EditorRange) {
+  return _editor.codeMirror.markText(
     { ch: start.column, line: start.line },
     { ch: end.column, line: end.line },
     { className }
   );
 }
 
-function lineAtHeight(editor, sourceId, event) {
-  const editorLine = editor.codeMirror.lineAtHeight(event.clientY);
-  return toSourceLine(sourceId, editorLine);
+export function lineAtHeight(_editor, sourceId, event) {
+  const _editorLine = _editor.codeMirror.lineAtHeight(event.clientY);
+  return toSourceLine(sourceId, _editorLine);
 }
 
-function getSourceLocationFromMouseEvent(editor, selectedLocation, e) {
-  const { line, ch } = editor.codeMirror.coordsChar({
+export function getSourceLocationFromMouseEvent(
+  _editor: Object,
+  selectedLocation: Location,
+  e: MouseEvent
+) {
+  const { line, ch } = _editor.codeMirror.coordsChar({
     left: e.clientX,
     top: e.clientY
   });
@@ -151,26 +188,26 @@ function getSourceLocationFromMouseEvent(editor, selectedLocation, e) {
   };
 }
 
-module.exports = Object.assign(
-  {},
-  expressionUtils,
-  sourceDocumentUtils,
-  sourceSearchUtils,
-  SourceEditorUtils,
-  {
-    createEditor,
-    isWasm,
-    toEditorLine,
-    toEditorPosition,
-    toEditorRange,
-    toSourceLine,
-    scrollToColumn,
-    toSourceLocation,
-    shouldShowPrettyPrint,
-    shouldShowFooter,
-    traverseResults,
-    markText,
-    lineAtHeight,
-    getSourceLocationFromMouseEvent
-  }
-);
+export function forEachLine(codeMirror, iter) {
+  codeMirror.operation(() => {
+    codeMirror.doc.iter(0, codeMirror.lineCount(), iter);
+  });
+}
+
+export function removeLineClass(codeMirror, line, className) {
+  codeMirror.removeLineClass(line, "line", className);
+}
+
+export function clearLineClass(codeMirror, className) {
+  forEachLine(codeMirror, line => {
+    removeLineClass(codeMirror, line, className);
+  });
+}
+
+export function getTextForLine(codeMirror, line) {
+  return codeMirror.getLine(line - 1).trim();
+}
+
+export function getCursorLine(codeMirror): number {
+  return codeMirror.getCursor().line;
+}

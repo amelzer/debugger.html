@@ -4,6 +4,7 @@
 * [Test Steps](#test-steps)
 * [Testing](#testing)
 * [Reviews](#reviews)
+* [Spell Checking](#spell-checking)
 * [Git Workflow](#git-workflow)
 * [Updates](#updates)
 * [CI](#ci)
@@ -12,7 +13,7 @@
 
 Include screenshots and animated GIFs in your pull request whenever possible.
 
-**Recording GIFs** There are many great tools for recording a GIF. On a mac, we recommend [recordit](http://recordit.co/), which is a free lightweight app.
+**Recording GIFs** There are many great tools for recording a GIF. On a mac, we recommend [recordit](http://recordit.co/), which is a free lightweight app. If you are using Ubuntu, you can also try using [Peek](https://github.com/phw/peek).
 
 <details>
 <summary>
@@ -104,14 +105,27 @@ Steps:
 3. Fetch the user's branches `git fetch <username>`
 4. checkout the user's branch `git checkout --track <username>/<pr-branch>`. `--track` is helpful if you later want to pull down subsequent changes to the PR.
 
+### Spell Checking
+
+We use the fabulous [retext] project for spell checking and other grammatical checks. If you see a spell checking error in your markdown, you can add some of the misspelled words to our dictionary in [`assets/dictionary.txt`](../assets/dictionary.txt)
+
+![][sc]
+
+[retext]: https://unifiedjs.github.io/
+[sc]: https://user-images.githubusercontent.com/254562/32508090-342a0d62-c3b7-11e7-80aa-17b430a675fd.png
+
 ### Git Workflow
 
-Working on OSS is an exercise in git collaboration. No matter how well you know
-git you're going to learn something new. Here is a great overview of the github [workflow][forking].
-Also, we highly recommend the [learn git branching][git-tutorial]!
+Working on OSS will test your git game! No matter how well you know
+git you're going to learn something new. Here are some links we've found useful:
+
+* [Learn git branching][git-tutorial] - an interactive environment for learning how git commands work
+* [Git Forking][forking] - Overview of creating a feature branch, keeping it up-to-date, and publishing it
+* [Flight Rules][flight-rules] - A guide about what to do when things go wrong
 
 [forking]: https://gist.github.com/Chaser324/ce0505fbed06b947d962#file-github-forking-md
 [git-tutorial]: https://learngitbranching.js.org/
+[flight-rules]:https://github.com/k88hudson/git-flight-rules
 
 #### Merge Conflicts
 
@@ -124,7 +138,7 @@ Once your branch is clean, you should update your local master branch. It's a go
 point to [origin][orig], but often the `master` branch points to
 your fork. If this is the case, then you'll need to add `origin` as a [remote][rdoc].
 
-Once master is uptodate, you can go back to your feature branch and update it.
+Once master is up-to-date, you can go back to your feature branch and update it.
 Generally the best thing to do is to rebase it against master: `git rebase master`,
 but rebases are complicated so checkout the [servo], [edx], and [docs][rebase-docs].
 
@@ -156,7 +170,7 @@ Here are the steps for [pushing to a branch].
 
 ### CI
 
-We use [Circle] for CI, which is generally pretty great. Our test run is defined in [circle.yml].
+We use [Circle] for CI, which is generally pretty great. Our test run is defined in [config.yml].
 
 #### Testing on CI
 
@@ -194,4 +208,4 @@ it locally. There are three steps:
 [pushing to a branch]: ./maintainer.md#pushing-to-a-branch
 
 [Circle]: https://circleci.com/
-[circle.yml]: ../circle.yml
+[config.yml]: ../.circleci/config.yml

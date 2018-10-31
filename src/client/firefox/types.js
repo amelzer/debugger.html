@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
 /**
@@ -14,7 +18,7 @@ import type {
   Pause,
   Frame,
   SourceId
-} from "debugger-html";
+} from "../../types";
 
 type URL = string;
 
@@ -193,23 +197,6 @@ export type TabPayload = {
 };
 
 /**
- * Response from the `listTabs` function call
- * @memberof firefox
- * @static
- */
-export type ListTabsResponse = {
-  actorRegistryActor: ActorId,
-  addonsActor: ActorId,
-  deviceActor: ActorId,
-  directorRegistryActor: ActorId,
-  from: string,
-  heapSnapshotFileActor: ActorId,
-  preferenceActor: ActorId,
-  selected: number,
-  tabs: TabPayload[]
-};
-
-/**
  * Actions
  * @memberof firefox
  * @static
@@ -217,8 +204,9 @@ export type ListTabsResponse = {
 export type Actions = {
   paused: Pause => void,
   resumed: ResumedPacket => void,
-  newSource: Source => void,
-  fetchEventListeners: () => void
+  newSources: (Source[]) => void,
+  fetchEventListeners: () => void,
+  updateWorkers: () => void
 };
 
 /**
@@ -233,11 +221,23 @@ export type TabTarget = {
       script: Script,
       func: Function,
       params?: { frameActor?: FrameId }
+    ) => void,
+    evaluateJSAsync: (
+      script: Script,
+      func: Function,
+      params?: { frameActor?: FrameId }
+    ) => void,
+    autocomplete: (
+      input: string,
+      cursor: number,
+      func: Function,
+      frameId: string
     ) => void
   },
   form: { consoleActor: any },
+  root: any,
   activeTab: {
-    navigateTo: string => Promise<*>,
+    navigateTo: ({ url: string }) => Promise<*>,
     reload: () => Promise<*>
   },
   destroy: () => void
@@ -260,10 +260,19 @@ export type DebuggerClient = {
     delete: any => void
   },
   mainRoot: {
-    traits: any
+    traits: any,
+    getFront: string => Promise<*>
   },
   connect: () => Promise<*>,
-  listTabs: () => Promise<*>
+  request: (packet: Object) => Promise<*>,
+  createObjectClient: (grip: Grip) => {},
+  release: (actor: String) => {}
+};
+
+export type TabClient = {
+  listWorkers: () => Promise<*>,
+  addListener: (string, Function) => void,
+  on: (string, Function) => void
 };
 
 /**
@@ -335,11 +344,17 @@ export type ThreadClient = {
   stepIn: Function => Promise<*>,
   stepOver: Function => Promise<*>,
   stepOut: Function => Promise<*>,
+  rewind: Function => Promise<*>,
+  reverseStepIn: Function => Promise<*>,
+  reverseStepOver: Function => Promise<*>,
+  reverseStepOut: Function => Promise<*>,
   breakOnNext: () => Promise<*>,
   // FIXME: unclear if SourceId or ActorId here
   source: ({ actor: SourceId }) => SourceClient,
   pauseGrip: (Grip | Function) => ObjectClient,
   pauseOnExceptions: (boolean, boolean) => Promise<*>,
+  setXHRBreakpoint: (path: string, method: string) => Promise<boolean>,
+  removeXHRBreakpoint: (path: string, method: string) => Promise<boolean>,
   interrupt: () => Promise<*>,
   eventListeners: () => Promise<*>,
   getFrames: (number, number) => FramesResponse,
@@ -347,7 +362,10 @@ export type ThreadClient = {
   addListener: (string, Function) => void,
   getSources: () => Promise<SourcesPacket>,
   reconfigure: ({ observeAsmJS: boolean }) => Promise<*>,
-  getLastPausePacket: () => ?PausedPacket
+  getLastPausePacket: () => ?PausedPacket,
+  _parent: TabClient,
+  actor: ActorId,
+  request: (payload: Object) => Promise<*>
 };
 
 /**

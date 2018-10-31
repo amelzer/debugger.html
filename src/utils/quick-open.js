@@ -1,29 +1,35 @@
-// @flow
-import { endTruncateStr } from "./utils";
-import { isPretty, getSourcePath, isThirdParty } from "./source";
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
-import type { Location as BabelLocation } from "babel-traverse";
-import type { SourcesMap } from "../reducers/sources";
+// @flow
+import classnames from "classnames";
+import { endTruncateStr } from "./utils";
+import { isPretty, getFilename, getSourceClassnames } from "./source";
+
+import type { Location as BabelLocation } from "@babel/types";
+import type { Symbols } from "../reducers/ast";
 import type { QuickOpenType } from "../reducers/quick-open";
-import type {
-  SymbolDeclaration,
-  SymbolDeclarations
-} from "../workers/parser/types";
+import type { TabList } from "../reducers/tabs";
+import type { Source } from "../types";
+import type { SymbolDeclaration } from "../workers/parser";
+
+export const MODIFIERS = {
+  "@": "functions",
+  "#": "variables",
+  ":": "goto",
+  "?": "shortcuts"
+};
 
 export function parseQuickOpenQuery(query: string): QuickOpenType {
-  const modifierPattern = /^@|#|\:$/;
+  const modifierPattern = /^@|#|:|\?$/;
   const gotoSourcePattern = /^(\w+)\:/;
   const startsWithModifier = modifierPattern.test(query[0]);
   const isGotoSource = gotoSourcePattern.test(query);
 
   if (startsWithModifier) {
-    const modifiers = {
-      "@": "functions",
-      "#": "variables",
-      ":": "goto"
-    };
     const modifier = query[0];
-    return modifiers[modifier];
+    return MODIFIERS[modifier];
   }
 
   if (isGotoSource) {
@@ -45,42 +51,48 @@ export function parseLineColumn(query: string) {
   }
 }
 
-export type FormattedSymbolDeclaration = {|
+export function formatSourcesForList(source: Source, tabs: TabList) {
+  const title = getFilename(source);
+  const subtitle = endTruncateStr(source.relativeUrl, 100);
+  return {
+    value: source.relativeUrl,
+    title,
+    subtitle,
+    icon: tabs.some(tab => tab.url == source.url)
+      ? "tab result-item-icon"
+      : classnames(getSourceClassnames(source), "result-item-icon"),
+    id: source.id,
+    url: source.url
+  };
+}
+
+export type QuickOpenResult = {|
   id: string,
-  title: string,
-  subtitle: string,
   value: string,
-  location: BabelLocation
+  title: string | React$Element<"div">,
+  subtitle?: string,
+  location?: BabelLocation,
+  url?: string,
+  icon?: string
 |};
 
 export type FormattedSymbolDeclarations = {|
-  variables: Array<FormattedSymbolDeclaration>,
-  functions: Array<FormattedSymbolDeclaration>
+  variables: Array<QuickOpenResult>,
+  functions: Array<QuickOpenResult>
 |};
 
-export type FormattedSource = {|
-  value: string,
-  title: string,
-  subtitle: string,
-  id: string
-|};
-
-export function formatSymbol(
-  symbol: SymbolDeclaration
-): FormattedSymbolDeclaration {
+export function formatSymbol(symbol: SymbolDeclaration): QuickOpenResult {
   return {
     id: `${symbol.name}:${symbol.location.start.line}`,
     title: symbol.name,
-    subtitle: `:${symbol.location.start.line}`,
+    subtitle: `${symbol.location.start.line}`,
     value: symbol.name,
     location: symbol.location
   };
 }
 
-export function formatSymbols(
-  symbols: ?SymbolDeclarations
-): FormattedSymbolDeclarations {
-  if (!symbols) {
+export function formatSymbols(symbols: ?Symbols): FormattedSymbolDeclarations {
+  if (!symbols || symbols.loading) {
     return { variables: [], functions: [] };
   }
 
@@ -92,18 +104,34 @@ export function formatSymbols(
   };
 }
 
-export function formatSources(sources: SourcesMap): Array<FormattedSource> {
-  return sources
-    .valueSeq()
-    .toJS()
-    .filter(source => !isPretty(source) && !isThirdParty(source))
-    .map(source => ({
-      value: getSourcePath(source),
-      title: getSourcePath(source)
-        .split("/")
-        .pop(),
-      subtitle: endTruncateStr(getSourcePath(source), 100),
-      id: source.id
-    }))
-    .filter(formattedSource => formattedSource.value != "");
+export function formatShortcutResults(): Array<QuickOpenResult> {
+  return [
+    {
+      value: L10N.getStr("symbolSearch.search.functionsPlaceholder.title"),
+      title: `@ ${L10N.getStr("symbolSearch.search.functionsPlaceholder")}`,
+      id: "@"
+    },
+    {
+      value: L10N.getStr("symbolSearch.search.variablesPlaceholder.title"),
+      title: `# ${L10N.getStr("symbolSearch.search.variablesPlaceholder")}`,
+      id: "#"
+    },
+    {
+      value: L10N.getStr("gotoLineModal.title"),
+      title: `: ${L10N.getStr("gotoLineModal.placeholder")}`,
+      id: ":"
+    }
+  ];
+}
+
+export function formatSources(
+  sources: { [string]: Source },
+  tabs: TabList
+): Array<QuickOpenResult> {
+  const sourceList: Source[] = (Object.values(sources): any);
+
+  return sourceList
+    .filter(source => !isPretty(source))
+    .filter(({ relativeUrl }) => !!relativeUrl)
+    .map(source => formatSourcesForList(source, tabs));
 }

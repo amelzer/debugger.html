@@ -1,23 +1,44 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 /* @flow */
 
 import { BinaryReader } from "wasmparser/dist/WasmParser";
-import { WasmDisassembler } from "wasmparser/dist/WasmDis";
+import { WasmDisassembler, NameSectionReader } from "wasmparser/dist/WasmDis";
 
 type WasmState = {
   lines: Array<number>,
   offsets: Array<number>
 };
 
-var wasmStates: { [string]: WasmState } = Object.create(null);
+var wasmStates: { [string]: WasmState } = (Object.create(null): any);
+
+function maybeWasmSectionNameResolver(data: Uint8Array) {
+  try {
+    const parser = new BinaryReader();
+    parser.setData(data.buffer, 0, data.length);
+    const reader = new NameSectionReader();
+    reader.read(parser);
+    return reader.hasValidNames() ? reader.getNameResolver() : null;
+  } catch (ex) {
+    // Ignoring any errors during names section retrival.
+    return null;
+  }
+}
 
 /**
  * @memberof utils/wasm
  * @static
  */
-function getWasmText(sourceId: string, data: Uint8Array) {
+export function getWasmText(sourceId: string, data: Uint8Array) {
+  const nameResolver = maybeWasmSectionNameResolver(data);
   const parser = new BinaryReader();
   parser.setData(data.buffer, 0, data.length);
   const dis = new WasmDisassembler();
+  if (nameResolver) {
+    dis.nameResolver = nameResolver;
+  }
   dis.addOffsets = true;
   const done = dis.disassembleChunk(parser);
   let result = dis.getResult();
@@ -40,7 +61,7 @@ function getWasmText(sourceId: string, data: Uint8Array) {
  * @memberof utils/wasm
  * @static
  */
-function getWasmLineNumberFormatter(sourceId: string) {
+export function getWasmLineNumberFormatter(sourceId: string) {
   const codeOf0 = 48,
     codeOfA = 65;
   const buffer = [
@@ -76,7 +97,7 @@ function getWasmLineNumberFormatter(sourceId: string) {
  * @memberof utils/wasm
  * @static
  */
-function isWasm(sourceId: string) {
+export function isWasm(sourceId: string) {
   return sourceId in wasmStates;
 }
 
@@ -84,7 +105,7 @@ function isWasm(sourceId: string) {
  * @memberof utils/wasm
  * @static
  */
-function lineToWasmOffset(sourceId: string, number: number): ?number {
+export function lineToWasmOffset(sourceId: string, number: number): ?number {
   const wasmState = wasmStates[sourceId];
   if (!wasmState) {
     return undefined;
@@ -100,7 +121,7 @@ function lineToWasmOffset(sourceId: string, number: number): ?number {
  * @memberof utils/wasm
  * @static
  */
-function wasmOffsetToLine(sourceId: string, offset: number): ?number {
+export function wasmOffsetToLine(sourceId: string, offset: number): ?number {
   const wasmState = wasmStates[sourceId];
   if (!wasmState) {
     return undefined;
@@ -112,31 +133,21 @@ function wasmOffsetToLine(sourceId: string, offset: number): ?number {
  * @memberof utils/wasm
  * @static
  */
-function clearWasmStates() {
-  wasmStates = Object.create(null);
+export function clearWasmStates() {
+  wasmStates = (Object.create(null): any);
 }
 
-function renderWasmText(sourceId: string, { binary }: Object) {
+export function renderWasmText(sourceId: string, { binary }: any) {
   // binary does not survive as Uint8Array, converting from string
   const data = new Uint8Array(binary.length);
   for (let i = 0; i < data.length; i++) {
     data[i] = binary.charCodeAt(i);
   }
   const { lines } = getWasmText(sourceId, data);
-  const MAX_LINES = 100000;
+  const MAX_LINES = 1000000;
   if (lines.length > MAX_LINES) {
     lines.splice(MAX_LINES, lines.length - MAX_LINES);
     lines.push(";; .... text is truncated due to the size");
   }
   return lines;
 }
-
-export {
-  getWasmText,
-  getWasmLineNumberFormatter,
-  isWasm,
-  lineToWasmOffset,
-  wasmOffsetToLine,
-  clearWasmStates,
-  renderWasmText
-};

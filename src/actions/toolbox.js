@@ -1,11 +1,14 @@
-// @flow
-
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-const { isDevelopment } = require("devtools-config");
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
+// @flow
+
+const { isDevelopment } = require("devtools-environment");
+const { getSelectedFrameId } = require("../selectors");
 
 import type { ThunkArgs } from "./types";
+import type { Worker } from "../types";
 
 /**
  * @memberof actions/toolbox
@@ -19,5 +22,28 @@ export function openLink(url: string) {
     } else {
       openLinkCommand(url);
     }
+  };
+}
+
+export function openWorkerToolbox(worker: Worker) {
+  return async function({
+    getState,
+    openWorkerToolbox: openWorkerToolboxCommand
+  }: ThunkArgs) {
+    if (isDevelopment()) {
+      alert(worker.url);
+    } else {
+      openWorkerToolboxCommand(worker);
+    }
+  };
+}
+
+export function evaluateInConsole(inputString: string) {
+  return async ({ client, getState }: ThunkArgs) => {
+    const frameId = getSelectedFrameId(getState());
+    client.evaluate(
+      `console.log("${inputString}"); console.log(${inputString})`,
+      { frameId }
+    );
   };
 }

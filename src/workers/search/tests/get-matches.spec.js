@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 import getMatches from "../get-matches";
 
 describe("search", () => {
@@ -10,7 +14,7 @@ describe("search", () => {
         wholeWord: false,
         regexMatch: false
       });
-      expect(matchLocations.length).toBe(3);
+      expect(matchLocations).toHaveLength(3);
     });
 
     it("gets basic string match case-sensitive", () => {
@@ -21,7 +25,7 @@ describe("search", () => {
         wholeWord: false,
         regexMatch: false
       });
-      expect(matchLocations.length).toBe(1);
+      expect(matchLocations).toHaveLength(1);
     });
 
     it("gets whole word string match", () => {
@@ -32,7 +36,7 @@ describe("search", () => {
         wholeWord: true,
         regexMatch: false
       });
-      expect(matchLocations.length).toBe(2);
+      expect(matchLocations).toHaveLength(2);
     });
 
     it("gets regex match", () => {
@@ -43,7 +47,7 @@ describe("search", () => {
         wholeWord: false,
         regexMatch: true
       });
-      expect(matchLocations.length).toBe(4);
+      expect(matchLocations).toHaveLength(4);
     });
 
     it("it doesnt fail on empty data", () => {
@@ -54,7 +58,7 @@ describe("search", () => {
         wholeWord: false,
         regexMatch: true
       });
-      expect(matchLocations.length).toBe(0);
+      expect(matchLocations).toHaveLength(0);
     });
 
     it("fails gracefully when the line is too long", () => {
@@ -65,7 +69,31 @@ describe("search", () => {
         wholeWord: false,
         regexMatch: true
       });
-      expect(matchLocations.length).toBe(0);
+      expect(matchLocations).toHaveLength(0);
+    });
+
+    // regression test for #6896
+    it("doesn't crash on the regex 'a*'", () => {
+      const text = "abc";
+      const query = "a*";
+      const matchLocations = getMatches(query, text, {
+        caseSensitive: true,
+        wholeWord: false,
+        regexMatch: true
+      });
+      expect(matchLocations).toHaveLength(4);
+    });
+
+    // regression test for #6896
+    it("doesn't crash on the regex '^'", () => {
+      const text = "012";
+      const query = "^";
+      const matchLocations = getMatches(query, text, {
+        caseSensitive: true,
+        wholeWord: false,
+        regexMatch: true
+      });
+      expect(matchLocations).toHaveLength(1);
     });
   });
 });

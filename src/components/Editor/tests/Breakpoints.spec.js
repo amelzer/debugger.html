@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 import React from "react";
 import { shallow } from "enzyme";
 import Breakpoints from "../Breakpoints";
@@ -33,7 +37,7 @@ describe("Breakpoints Component", () => {
     const breakpoints = I.Map({ id1: { location: { sourceId } } });
 
     const { component, props } = render({ breakpoints });
-    expect(component.find("Breakpoint").length).toBe(props.breakpoints.size);
+    expect(component.find("Breakpoint")).toHaveLength(props.breakpoints.size);
   });
 
   it("should render breakpoints with columns", async () => {
@@ -41,7 +45,7 @@ describe("Breakpoints Component", () => {
     const breakpoints = I.Map({ id1: { location: { column: 2, sourceId } } });
 
     const { component, props } = render({ breakpoints });
-    expect(component.find("Breakpoint").length).toBe(props.breakpoints.size);
+    expect(component.find("Breakpoint")).toHaveLength(props.breakpoints.size);
     expect(component).toMatchSnapshot();
   });
 });

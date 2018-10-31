@@ -53,6 +53,15 @@ function quickOpen(dbg, query, shortcut = "quickOpen") {
   query !== "" && type(dbg, query);
 }
 
+function findResultEl(dbg, index = 1) {
+  return waitForElementWithSelector(dbg, `.result-item:nth-child(${index})`);
+}
+
+async function assertResultIsTab(dbg, index)  {
+  const el = await findResultEl(dbg, index);
+  ok(el && !!el.querySelector('.tab.result-item-icon'), 'Result should be a tab');
+}
+
 // Testing quick open
 add_task(async function() {
   const dbg = await initDebugger("doc-script-switching.html");
@@ -62,22 +71,31 @@ add_task(async function() {
   pressKey(dbg, "Escape");
   assertDisabled(dbg);
 
-  quickOpen(dbg, "sw");
-  pressKey(dbg, "Enter");
-
-  let source = dbg.selectors.getSelectedSource(dbg.getState());
-  ok(source.get("url").match(/switching-01/), "first source is selected");
-  await waitForSelectedSource(dbg, "switching-01");
-
-  info("Arrow keys and check to see if source is selected");
+  info("Testing the number of results for source search");
   quickOpen(dbg, "sw");
   is(resultCount(dbg), 2, "two file results");
+  pressKey(dbg, "Escape");
+
+  info("Testing source search and check to see if source is selected");
+  await waitForSource(dbg, "switching-01");
+  quickOpen(dbg, "sw1");
+  is(resultCount(dbg), 1, "one file results");
+  pressKey(dbg, "Enter");
+  await waitForSelectedSource(dbg, "switching-01");
+
+  info("Test that results show tab icons");
+  quickOpen(dbg, "sw1");
+  await assertResultIsTab(dbg, 1);
+  pressKey(dbg, "Tab");
+
+  info("Testing arrow keys in source search and check to see if source is selected");
+  quickOpen(dbg, "sw2");
+  is(resultCount(dbg), 1, "one file results");
   pressKey(dbg, "Down");
   pressKey(dbg, "Enter");
-
-  source = dbg.selectors.getSelectedSource(dbg.getState());
-  ok(source.get("url").match(/switching-02/), "second source is selected");
   await waitForSelectedSource(dbg, "switching-02");
+
+  info("Testing tab closes the search");
   quickOpen(dbg, "sw");
   pressKey(dbg, "Tab");
   assertDisabled(dbg);
@@ -86,7 +104,7 @@ add_task(async function() {
   quickOpen(dbg, "", "quickOpenFunc");
   is(resultCount(dbg), 2, "two function results");
 
-  type(dbg, "x");
+  type(dbg, "@x");
   is(resultCount(dbg), 0, "no functions with 'x' in name");
 
   pressKey(dbg, "Escape");
@@ -99,12 +117,12 @@ add_task(async function() {
   quickOpen(dbg, "#");
   is(resultCount(dbg), 1, "one variable result");
   const results = findAllElements(dbg, "resultItems");
-  results.forEach(result => is(result.textContent, "x:13"));
+  results.forEach(result => is(result.textContent, "x13"));
   await waitToClose(dbg);
 
   info("Testing goto line:column");
-  assertLine(dbg, undefined);
-  assertColumn(dbg, undefined);
+  assertLine(dbg, 0);
+  assertColumn(dbg, null);
   quickOpen(dbg, ":7:12");
   pressKey(dbg, "Enter");
   assertLine(dbg, 7);
@@ -113,7 +131,6 @@ add_task(async function() {
   info("Testing gotoSource");
   quickOpen(dbg, "sw1:5");
   pressKey(dbg, "Enter");
-  source = dbg.selectors.getSelectedSource(dbg.getState());
-  ok(source.get("url").match(/switching-01/), "first source is selected");
+  await waitForSelectedSource(dbg, "switching-01");
   assertLine(dbg, 5);
 });

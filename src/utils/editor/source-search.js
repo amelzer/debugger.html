@@ -1,6 +1,10 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
-import buildQuery from "../../workers/search/build-query";
+import buildQuery from "../build-query";
 
 import type { SearchModifiers } from "../../types";
 
@@ -27,7 +31,7 @@ function SearchState() {
  * @memberof utils/source-search
  * @static
  */
-function getSearchState(cm: any, query, modifiers) {
+function getSearchState(cm: any, query) {
   const state = cm.state.search || (cm.state.search = new SearchState());
   return state;
 }
@@ -100,7 +104,11 @@ function updateCursor(cm, state, keepSelection) {
   }
 }
 
-function getMatchIndex(count: number, currentIndex: number, rev: boolean) {
+export function getMatchIndex(
+  count: number,
+  currentIndex: number,
+  rev: boolean
+) {
   if (!rev) {
     if (currentIndex == count - 1) {
       return 0;
@@ -133,11 +141,11 @@ function doSearch(ctx, rev, query, keepSelection, modifiers: SearchModifiers) {
 
   return cm.operation(function() {
     if (!query || isWhitespace(query)) {
-      clearSearch(cm, query, modifiers);
+      clearSearch(cm, query);
       return;
     }
 
-    const state = getSearchState(cm, query, modifiers);
+    const state = getSearchState(cm, query);
     const isNewQuery = state.query !== query;
     state.query = query;
 
@@ -146,6 +154,31 @@ function doSearch(ctx, rev, query, keepSelection, modifiers: SearchModifiers) {
     const searchLocation = searchNext(ctx, rev, query, isNewQuery, modifiers);
 
     return searchLocation ? searchLocation.from : defaultIndex;
+  });
+}
+
+export function searchSourceForHighlight(
+  ctx: Object,
+  rev: boolean,
+  query: string,
+  keepSelection: boolean,
+  modifiers: SearchModifiers,
+  line: number,
+  ch: number
+) {
+  const { cm } = ctx;
+  if (!cm) {
+    return;
+  }
+
+  return cm.operation(function() {
+    const state = getSearchState(cm, query);
+    const isNewQuery = state.query !== query;
+    state.query = query;
+
+    updateOverlay(cm, state, query, modifiers);
+    updateCursor(cm, state, keepSelection);
+    findNextOnLine(ctx, rev, query, isNewQuery, modifiers, line, ch);
   });
 }
 
@@ -167,7 +200,7 @@ function searchNext(ctx, rev, query, newQuery, modifiers) {
   const { cm, ed } = ctx;
   let nextMatch;
   cm.operation(function() {
-    const state = getSearchState(cm, query, modifiers);
+    const state = getSearchState(cm, query);
     const pos = getCursorPos(newQuery, rev, state);
 
     if (!state.query) {
@@ -200,14 +233,36 @@ function searchNext(ctx, rev, query, newQuery, modifiers) {
   return nextMatch;
 }
 
+function findNextOnLine(ctx, rev, query, newQuery, modifiers, line, ch) {
+  const { cm, ed } = ctx;
+  cm.operation(function() {
+    const pos = { line: line - 1, ch };
+    let cursor = getSearchCursor(cm, query, pos, modifiers);
+
+    if (!cursor.find(rev) && query) {
+      cursor = getSearchCursor(cm, query, pos, modifiers);
+      if (!cursor.find(rev)) {
+        return;
+      }
+    }
+
+    // We don't want to jump the editor
+    // when we're selecting text
+    if (!cm.state.selectingText) {
+      ed.alignLine(cursor.from().line, "center");
+      cm.setSelection(cursor.from(), cursor.to());
+    }
+  });
+}
+
 /**
  * Remove overlay.
  *
  * @memberof utils/source-search
  * @static
  */
-function removeOverlay(ctx: any, query: string, modifiers: SearchModifiers) {
-  const state = getSearchState(ctx.cm, query, modifiers);
+export function removeOverlay(ctx: any, query: string) {
+  const state = getSearchState(ctx.cm, query);
   ctx.cm.removeOverlay(state.overlay);
   const { line, ch } = ctx.cm.getCursor();
   ctx.cm.doc.setSelection({ line, ch }, { line, ch }, { scroll: false });
@@ -219,8 +274,8 @@ function removeOverlay(ctx: any, query: string, modifiers: SearchModifiers) {
  * @memberof utils/source-search
  * @static
  */
-function clearSearch(cm, query: string, modifiers: SearchModifiers) {
-  const state = getSearchState(cm, query, modifiers);
+export function clearSearch(cm: any, query: string) {
+  const state = getSearchState(cm, query);
 
   state.results = [];
 
@@ -237,13 +292,13 @@ function clearSearch(cm, query: string, modifiers: SearchModifiers) {
  * @memberof utils/source-search
  * @static
  */
-function find(
+export function find(
   ctx: any,
   query: string,
   keepSelection: boolean,
   modifiers: SearchModifiers
 ) {
-  clearSearch(ctx.cm, query, modifiers);
+  clearSearch(ctx.cm, query);
   return doSearch(ctx, false, query, keepSelection, modifiers);
 }
 
@@ -253,7 +308,7 @@ function find(
  * @memberof utils/source-search
  * @static
  */
-function findNext(
+export function findNext(
   ctx: any,
   query: string,
   keepSelection: boolean,
@@ -268,7 +323,7 @@ function findNext(
  * @memberof utils/source-search
  * @static
  */
-function findPrev(
+export function findPrev(
   ctx: any,
   query: string,
   keepSelection: boolean,
@@ -277,4 +332,4 @@ function findPrev(
   return doSearch(ctx, true, query, keepSelection, modifiers);
 }
 
-export { buildQuery, find, findNext, findPrev, removeOverlay, getMatchIndex };
+export { buildQuery };

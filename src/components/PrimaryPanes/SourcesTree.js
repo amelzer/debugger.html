@@ -1,392 +1,387 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
-// React
+// Dependencies
 import React, { Component } from "react";
 import classnames from "classnames";
-
-// Redux
-import { bindActionCreators } from "redux";
 import { connect } from "react-redux";
+
+// Selectors
 import {
   getShownSource,
   getSelectedSource,
   getDebuggeeUrl,
   getExpandedState,
   getProjectDirectoryRoot,
-  getSources
+  getRelativeSources,
+  getSourceCount
 } from "../../selectors";
+
+import { getGeneratedSourceByURL } from "../../reducers/sources";
+
+// Actions
 import actions from "../../actions";
 
-// Types
-import type { SourcesMap } from "../../reducers/types";
-import type { SourceRecord } from "../../reducers/sources";
-
 // Components
+import SourcesTreeItem from "./SourcesTreeItem";
 import ManagedTree from "../shared/ManagedTree";
 import Svg from "../shared/Svg";
 
 // Utils
 import {
-  nodeHasChildren,
-  createParentMap,
-  isDirectory,
-  addToTree,
-  collapseTree,
   createTree,
-  getDirectories
+  getDirectories,
+  isDirectory,
+  getSourceFromNode,
+  nodeHasChildren,
+  updateTree
 } from "../../utils/sources-tree";
-import { Set } from "immutable";
-import { showMenu } from "devtools-launchpad";
-import { copyToTheClipboard } from "../../utils/clipboard";
-import { throttle } from "../../utils/utils";
-import { features } from "../../utils/prefs";
-import { setProjectDirectoryRoot } from "../../actions/ui";
+import { getRawSourceURL } from "../../utils/source";
+
+import type {
+  TreeNode,
+  TreeDirectory,
+  ParentMap
+} from "../../utils/sources-tree/types";
+import type { Source } from "../../types";
+import type { SourcesMap, State as AppState } from "../../reducers/types";
+import type { Item } from "../shared/ManagedTree";
 
 type Props = {
   sources: SourcesMap,
-  selectSource: string => void,
-  shownSource?: string,
-  selectedSource?: SourceRecord,
+  sourceCount: number,
+  shownSource?: Source,
+  selectedSource?: Source,
   debuggeeUrl: string,
   projectRoot: string,
-  setExpandedState: any => void,
-  expanded?: any
+  expanded: Set<string> | null,
+  selectSource: string => mixed,
+  setExpandedState: (Set<string>) => mixed,
+  clearProjectDirectoryRoot: () => void
 };
 
 type State = {
-  focusedItem?: any,
-  parentMap: any,
-  sourceTree: any,
-  projectRoot: string,
-  uncollapsedTree: any,
+  focusedItem: ?TreeNode,
+  parentMap: ParentMap,
+  sourceTree: TreeDirectory,
+  uncollapsedTree: TreeDirectory,
   listItems?: any,
   highlightItems?: any
 };
 
+type SetExpanded = (item: TreeNode, expanded: boolean, altKey: boolean) => void;
+
 class SourcesTree extends Component<Props, State> {
-  focusItem: Function;
-  selectItem: Function;
-  getPath: Function;
-  getIcon: Function;
-  queueUpdate: Function;
-  onContextMenu: Function;
-  renderItem: Function;
   mounted: boolean;
 
-  constructor(props) {
+  constructor(props: Props) {
     super(props);
-    this.state = createTree(
-      this.props.sources,
-      this.props.debuggeeUrl,
-      this.props.projectRoot
-    );
-    this.focusItem = this.focusItem.bind(this);
-    this.selectItem = this.selectItem.bind(this);
-    this.getPath = this.getPath.bind(this);
-    this.getIcon = this.getIcon.bind(this);
-    this.onContextMenu = this.onContextMenu.bind(this);
-    this.renderItem = this.renderItem.bind(this);
+    const { debuggeeUrl, sources, projectRoot } = this.props;
 
-    this.queueUpdate = throttle(function() {
-      if (!this.mounted) {
-        return;
-      }
-
-      this.forceUpdate();
-    }, 50);
+    this.state = createTree({
+      projectRoot,
+      debuggeeUrl,
+      sources
+    });
   }
 
   componentDidMount() {
-    this.mounted = true;
-  }
-
-  componentWillUnMount() {
-    this.mounted = false;
-  }
-
-  shouldComponentUpdate() {
-    this.queueUpdate();
-    return false;
-  }
-
-  componentWillReceiveProps(nextProps) {
-    if (
-      this.props.projectRoot !== nextProps.projectRoot ||
-      this.props.debuggeeUrl !== nextProps.debuggeeUrl
-    ) {
-      // Recreate tree because the sort order changed
-      this.setState(
-        createTree(
-          nextProps.sources,
-          nextProps.debuggeeUrl,
-          nextProps.projectRoot
-        )
-      );
-      return;
+    const { selectedSource } = this.props;
+    if (selectedSource) {
+      this.setHighlightFocusItems(selectedSource);
     }
+  }
+
+  componentWillReceiveProps(nextProps: Props) {
+    const {
+      projectRoot,
+      debuggeeUrl,
+      sources,
+      shownSource,
+      selectedSource
+    } = this.props;
+    const { uncollapsedTree, sourceTree } = this.state;
+
     if (
-      nextProps.shownSource &&
-      nextProps.shownSource != this.props.shownSource
+      projectRoot != nextProps.projectRoot ||
+      debuggeeUrl != nextProps.debuggeeUrl ||
+      nextProps.sourceCount === 0
     ) {
-      const listItems = getDirectories(
-        nextProps.shownSource,
-        this.state.sourceTree
+      // early recreate tree because of changes
+      // to project root, debugee url or lack of sources
+      return this.setState(
+        createTree({
+          sources: nextProps.sources,
+          debuggeeUrl: nextProps.debuggeeUrl,
+          projectRoot: nextProps.projectRoot
+        })
       );
+    }
 
-      if (listItems && listItems[0]) {
-        this.selectItem(listItems[0]);
-      }
-
-      return this.setState({ listItems });
+    if (nextProps.shownSource && nextProps.shownSource != shownSource) {
+      return this.setHighlightFocusItems(nextProps.shownSource);
     }
 
     if (
       nextProps.selectedSource &&
-      nextProps.selectedSource != this.props.selectedSource
+      nextProps.selectedSource != selectedSource
     ) {
-      const highlightItems = getDirectories(
-        nextProps.selectedSource.get("url"),
-        this.state.sourceTree
-      );
-
-      return this.setState({ highlightItems });
+      this.setHighlightFocusItems(nextProps.selectedSource);
     }
 
-    if (nextProps.sources === this.props.sources) {
-      return;
-    }
-
-    if (nextProps.sources.size === 0) {
-      // remove all sources
-      this.setState(
-        createTree(
-          nextProps.sources,
-          nextProps.debuggeeUrl,
-          nextProps.projectRoot
-        )
-      );
-      return;
-    }
-
-    // TODO: do not run this every time a source is clicked,
+    // NOTE: do not run this every time a source is clicked,
     // only when a new source is added
-    const next = Set(nextProps.sources.valueSeq());
-    const prev = Set(this.props.sources.valueSeq());
-    const newSet = next.subtract(prev);
-
-    const uncollapsedTree = this.state.uncollapsedTree;
-
-    // TODO: recreating the tree every time messes with the expanded
-    // state of ManagedTree, because it depends on item instances
-    // being the same. The result is that if a source is added at a
-    // later time, all expanded state is lost.
-    let sourceTree = this.state.sourceTree;
-    if (newSet.size > 0) {
-      for (const source of newSet) {
-        addToTree(
+    if (nextProps.sources != this.props.sources) {
+      this.setState(
+        updateTree({
+          newSources: nextProps.sources,
+          prevSources: sources,
+          debuggeeUrl,
+          projectRoot,
           uncollapsedTree,
-          source,
-          this.props.debuggeeUrl,
-          this.props.projectRoot
-        );
-      }
-      sourceTree = collapseTree(uncollapsedTree);
-    }
-
-    this.setState({
-      uncollapsedTree,
-      sourceTree,
-      parentMap: createParentMap(sourceTree)
-    });
-  }
-
-  focusItem(item) {
-    this.setState({ focusedItem: item });
-  }
-
-  selectItem(item) {
-    if (!nodeHasChildren(item)) {
-      this.props.selectSource(item.contents.get("id"));
-    }
-  }
-
-  getPath(item) {
-    const { sources } = this.props;
-    const blackBoxedPart =
-      item.contents.get &&
-      sources.get(item.contents.get("id")).get("isBlackBoxed")
-        ? "update"
-        : "";
-    return `${item.path}/${item.name}/${blackBoxedPart}`;
-  }
-
-  getIcon(sources, item, depth) {
-    const { debuggeeUrl } = this.props;
-
-    if (item.path === "/Webpack") {
-      return <Svg name="webpack" />;
-    }
-
-    if (depth === 0) {
-      return (
-        <img
-          className={classnames("domain", {
-            debuggee: debuggeeUrl && debuggeeUrl.includes(item.name)
-          })}
-        />
+          sourceTree,
+          focusedItem: this.state.focusedItem
+        })
       );
     }
-
-    if (!nodeHasChildren(item)) {
-      const source = sources.get(item.contents.get("id"));
-      if (source.get("isBlackBoxed")) {
-        return <img className="blackBox" />;
-      }
-      return <img className="file" />;
-    }
-
-    return <img className="folder" />;
   }
 
-  onContextMenu(event, item) {
-    const copySourceUri2Label = L10N.getStr("copySourceUri2");
-    const copySourceUri2Key = L10N.getStr("copySourceUri2.accesskey");
-    const setDirectoryRootLabel = L10N.getStr("setDirectoryRoot.label");
-    const setDirectoryRootKey = L10N.getStr("setDirectoryRoot.accesskey");
-
-    event.stopPropagation();
-    event.preventDefault();
-
-    const menuOptions = [];
-
-    if (!isDirectory(item)) {
-      const source = item.contents.get("url");
-      const copySourceUri2 = {
-        id: "node-menu-copy-source",
-        label: copySourceUri2Label,
-        accesskey: copySourceUri2Key,
-        disabled: false,
-        click: () => copyToTheClipboard(source)
-      };
-
-      menuOptions.push(copySourceUri2);
-    } else if (features.root) {
-      menuOptions.push({
-        id: "node-set-directory-root",
-        label: setDirectoryRootLabel,
-        accesskey: setDirectoryRootKey,
-        disabled: false,
-        click: () => setProjectDirectoryRoot(item.path)
-      });
+  setHighlightFocusItems(source: ?Source) {
+    const { sourceTree, parentMap } = this.state;
+    if (source) {
+      const items = getDirectories(source, parentMap, sourceTree);
+      return this.setState({ listItems: items, highlightItems: items });
     }
-    showMenu(event, menuOptions);
   }
 
-  renderItem(item, depth, focused, _, expanded, { setExpanded }) {
-    const arrow = nodeHasChildren(item) ? (
-      <img
-        className={classnames("arrow", {
-          expanded: expanded
-        })}
-        onClick={e => {
-          e.stopPropagation();
-          setExpanded(item, !expanded, e.altKey);
-        }}
-      />
-    ) : (
-      <i className="no-arrow" />
+  focusItem = (item: TreeNode) => {
+    this.setState({ focusedItem: item });
+  };
+
+  selectItem = (item: TreeNode) => {
+    if (item.type == "source" && !Array.isArray(item.contents)) {
+      this.props.selectSource(item.contents.id);
+    }
+  };
+
+  // NOTE: we get the source from sources because item.contents is cached
+  getSource(item: TreeNode): ?Source {
+    const source = getSourceFromNode(item);
+    if (source) {
+      return this.props.sources[source.id];
+    }
+
+    return null;
+  }
+
+  getPath = (item: TreeNode): string => {
+    const path = `${item.path}/${item.name}`;
+    const source = this.getSource(item);
+
+    if (!source || isDirectory(item)) {
+      return path;
+    }
+
+    const blackBoxedPart = source.isBlackBoxed ? ":blackboxed" : "";
+    return `${path}/${source.id}/${blackBoxedPart}`;
+  };
+
+  onExpand = (item: Item, expandedState: Set<string>) => {
+    this.props.setExpandedState(expandedState);
+  };
+
+  onCollapse = (item: Item, expandedState: Set<string>) => {
+    this.props.setExpandedState(expandedState);
+  };
+
+  onKeyDown = (e: KeyboardEvent) => {
+    const { focusedItem } = this.state;
+
+    if (e.keyCode === 13 && focusedItem) {
+      this.selectItem(focusedItem);
+    }
+  };
+
+  isEmpty() {
+    const { sourceTree } = this.state;
+    return sourceTree.contents.length === 0;
+  }
+
+  renderEmptyElement(message) {
+    return (
+      <div key="empty" className="no-sources-message">
+        {message}
+      </div>
     );
-    const { sources } = this.props;
-    const icon = this.getIcon(sources, item, depth);
-    let paddingDir = "paddingRight";
-    if (document.body && document.body.parentElement) {
-      paddingDir =
-        document.body.parentElement.dir == "ltr"
-          ? "paddingLeft"
-          : "paddingRight";
+  }
+
+  renderProjectRootHeader() {
+    const { projectRoot } = this.props;
+
+    if (!projectRoot) {
+      return null;
     }
+
+    const rootLabel = projectRoot.split("/").pop();
+
+    return (
+      <div key="root" className="sources-clear-root-container">
+        <button
+          className="sources-clear-root"
+          onClick={() => this.props.clearProjectDirectoryRoot()}
+          title={L10N.getStr("removeDirectoryRoot.label")}
+        >
+          <Svg name="home" />
+          <Svg name="breadcrumb" />
+          <span className="sources-clear-root-label">{rootLabel}</span>
+        </button>
+      </div>
+    );
+  }
+
+  getRoots = () => {
+    const { projectRoot } = this.props;
+    const { sourceTree } = this.state;
+
+    const sourceContents = sourceTree.contents[0];
+    const rootLabel = projectRoot.split("/").pop();
+
+    // The "sourceTree.contents[0]" check ensures that there are contents
+    // A custom root with no existing sources will be ignored
+    if (projectRoot) {
+      if (sourceContents && sourceContents.name !== rootLabel) {
+        return sourceContents.contents[0].contents;
+      }
+      return sourceContents.contents;
+    }
+
+    return sourceTree.contents;
+  };
+
+  renderItem = (
+    item: TreeNode,
+    depth: number,
+    focused: boolean,
+    _,
+    expanded: boolean,
+    { setExpanded }: { setExpanded: SetExpanded }
+  ) => {
+    const { debuggeeUrl, projectRoot } = this.props;
+
+    return (
+      <SourcesTreeItem
+        item={item}
+        depth={depth}
+        focused={focused}
+        expanded={expanded}
+        focusItem={this.focusItem}
+        selectItem={this.selectItem}
+        source={this.getSource(item)}
+        debuggeeUrl={debuggeeUrl}
+        projectRoot={projectRoot}
+        setExpanded={setExpanded}
+      />
+    );
+  };
+
+  renderTree() {
+    const { expanded } = this.props;
+    const { highlightItems, listItems, parentMap } = this.state;
+
+    const treeProps = {
+      autoExpandAll: false,
+      autoExpandDepth: expanded ? 0 : 1,
+      expanded,
+      getChildren: (item: $Shape<TreeDirectory>) =>
+        nodeHasChildren(item) ? item.contents : [],
+      getParent: (item: $Shape<TreeNode>) => parentMap.get(item),
+      getPath: this.getPath,
+      getRoots: this.getRoots,
+      highlightItems,
+      itemHeight: 21,
+      key: this.isEmpty() ? "empty" : "full",
+      listItems,
+      onCollapse: this.onCollapse,
+      onExpand: this.onExpand,
+      onFocus: this.focusItem,
+      renderItem: this.renderItem,
+      preventBlur: true
+    };
+
+    return <ManagedTree {...treeProps} />;
+  }
+
+  renderPane(...children) {
+    const { projectRoot } = this.props;
 
     return (
       <div
-        className={classnames("node", { focused })}
-        style={{ [paddingDir]: `${depth * 15 + 5}px` }}
-        key={item.path}
-        onClick={e => {
-          this.selectItem(item);
-          setExpanded(item, !expanded, e.altKey);
-        }}
-        onContextMenu={e => this.onContextMenu(e, item)}
+        key="pane"
+        className={classnames("sources-pane", {
+          "sources-list-custom-root": projectRoot
+        })}
       >
-        {arrow}
-        {icon}
-        <span className="label"> {item.name} </span>
+        {children}
       </div>
     );
   }
 
   render() {
-    const { setExpandedState, expanded } = this.props;
-    const {
-      focusedItem,
-      sourceTree,
-      parentMap,
-      listItems,
-      highlightItems
-    } = this.state;
+    const { projectRoot } = this.props;
 
-    const isEmpty = sourceTree.contents.length === 0;
-    const treeProps = {
-      key: isEmpty ? "empty" : "full",
-      getParent: item => parentMap.get(item),
-      getChildren: item => (nodeHasChildren(item) ? item.contents : []),
-      getRoots: () => sourceTree.contents,
-      getPath: this.getPath,
-      itemHeight: 21,
-      autoExpandDepth: expanded ? 0 : 1,
-      autoExpandAll: false,
-      onFocus: this.focusItem,
-      listItems,
-      highlightItems,
-      expanded,
-      onExpand: (item, expandedState) => setExpandedState(expandedState),
-      onCollapse: (item, expandedState) => setExpandedState(expandedState),
-      renderItem: this.renderItem
-    };
+    if (this.isEmpty()) {
+      if (projectRoot) {
+        return this.renderPane(
+          this.renderProjectRootHeader(),
+          this.renderEmptyElement(L10N.getStr("sources.noSourcesAvailableRoot"))
+        );
+      }
 
-    const tree = <ManagedTree {...treeProps} />;
-
-    if (isEmpty) {
-      return (
-        <div className="no-sources-message">
-          {L10N.getStr("sources.noSourcesAvailable")}
-        </div>
+      return this.renderPane(
+        this.renderEmptyElement(L10N.getStr("sources.noSourcesAvailable"))
       );
     }
 
-    const onKeyDown = e => {
-      if (e.keyCode === 13 && focusedItem) {
-        this.selectItem(focusedItem);
-      }
-    };
-
-    return (
-      <div className="sources-list" onKeyDown={onKeyDown}>
-        {tree}
+    return this.renderPane(
+      this.renderProjectRootHeader(),
+      <div key="tree" className="sources-list" onKeyDown={this.onKeyDown}>
+        {this.renderTree()}
       </div>
     );
   }
 }
 
+function getSourceForTree(state: AppState, source: ?Source): ?Source | null {
+  if (!source || !source.isPrettyPrinted) {
+    return source;
+  }
+
+  return getGeneratedSourceByURL(state, getRawSourceURL(source.url));
+}
+
+const mapStateToProps = state => {
+  const selectedSource = getSelectedSource(state);
+  const shownSource = getShownSource(state);
+
+  return {
+    shownSource: getSourceForTree(state, shownSource),
+    selectedSource: getSourceForTree(state, selectedSource),
+    debuggeeUrl: getDebuggeeUrl(state),
+    expanded: getExpandedState(state),
+    projectRoot: getProjectDirectoryRoot(state),
+    sources: getRelativeSources(state),
+    sourceCount: getSourceCount(state)
+  };
+};
+
 export default connect(
-  state => {
-    return {
-      shownSource: getShownSource(state),
-      selectedSource: getSelectedSource(state),
-      debuggeeUrl: getDebuggeeUrl(state),
-      expanded: getExpandedState(state),
-      projectRoot: getProjectDirectoryRoot(state),
-      sources: getSources(state)
-    };
-  },
-  dispatch => bindActionCreators(actions, dispatch)
+  mapStateToProps,
+  {
+    selectSource: actions.selectSource,
+    setExpandedState: actions.setExpandedState,
+    clearProjectDirectoryRoot: actions.clearProjectDirectoryRoot
+  }
 )(SourcesTree);

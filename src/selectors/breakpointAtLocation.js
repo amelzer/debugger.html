@@ -1,11 +1,10 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 import { getSelectedSource } from "../reducers/sources";
 import { getBreakpoints } from "../reducers/breakpoints";
-import { isGeneratedId } from "devtools-source-map";
-
-function isGenerated(selectedSource) {
-  const sourceId = selectedSource.get("id");
-  return isGeneratedId(sourceId);
-}
+import { isGenerated } from "../utils/source";
 
 function getColumn(column, selectedSource) {
   if (column) {
@@ -21,15 +20,12 @@ function getLocation(bp, selectedSource) {
     : bp.location;
 }
 
-function getBreakpointsForSource(
-  state: OuterState,
-  selectedSource: SourceRecord
-) {
+function getBreakpointsForSource(state: OuterState, selectedSource: Source) {
   const breakpoints = getBreakpoints(state);
 
   return breakpoints.filter(bp => {
     const location = getLocation(bp, selectedSource);
-    return location.sourceId === selectedSource.get("id");
+    return location.sourceId === selectedSource.id;
   });
 }
 
@@ -60,9 +56,18 @@ function findBreakpointAtLocation(
  * This is useful for finding a breakpoint when the
  * user clicks in the gutter or on a token.
  */
-export default function getBreakpointAtLocation(state, location) {
+export function getBreakpointAtLocation(state, location) {
   const selectedSource = getSelectedSource(state);
   const breakpoints = getBreakpointsForSource(state, selectedSource);
 
   return findBreakpointAtLocation(breakpoints, selectedSource, location);
+}
+
+export function getBreakpointsAtLine(state: OuterState, line: number) {
+  const selectedSource = getSelectedSource(state);
+  const breakpoints = getBreakpointsForSource(state, selectedSource);
+
+  return breakpoints.filter(
+    breakpoint => getLocation(breakpoint, selectedSource).line === line
+  );
 }

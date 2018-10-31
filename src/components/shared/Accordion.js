@@ -1,14 +1,19 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
-import React, { createElement, Component } from "react";
+import React, { cloneElement, Component } from "react";
 import Svg from "./Svg";
 
 import "./Accordion.css";
 
 type AccordionItem = {
   buttons?: Array<Object>,
-  component(): any,
+  component: React$Element<any>,
   componentProps: Object,
   header: string,
+  className: string,
   opened: boolean,
   onToggle?: () => void,
   shouldOpen?: () => void
@@ -23,75 +28,68 @@ type State = {
 
 class Accordion extends Component<Props, State> {
   constructor(props: Props) {
-    super();
-
+    super(props);
     this.state = {
       opened: props.items.map(item => item.opened),
       created: []
     };
   }
 
-  componentWillReceiveProps(nextProps: Props) {
-    const newOpened = this.state.opened.map((isOpen, i) => {
-      const { shouldOpen } = nextProps.items[i];
-
-      return isOpen || (shouldOpen && shouldOpen());
-    });
-
-    this.setState({ opened: newOpened });
-  }
-
   handleHeaderClick(i: number) {
-    const opened = [...this.state.opened];
-    const created = [...this.state.created];
     const item = this.props.items[i];
-
-    opened[i] = !opened[i];
-    created[i] = true;
-
-    if (opened[i] && item.onOpened) {
-      item.onOpened();
-    }
+    const opened = !item.opened;
+    item.opened = opened;
 
     if (item.onToggle) {
-      item.onToggle(opened[i]);
+      item.onToggle(opened);
     }
 
-    this.setState({ opened, created });
+    // We force an update because otherwise the accordion
+    // would not re-render
+    this.forceUpdate();
+  }
+
+  onHandleHeaderKeyDown(
+    e: SyntheticKeyboardEvent<HTMLHeadingElement>,
+    i: number
+  ) {
+    if (e && (e.key === " " || e.key === "Enter")) {
+      this.handleHeaderClick(i);
+    }
   }
 
   renderContainer = (item: AccordionItem, i: number) => {
-    const { opened, created } = this.state;
-    const containerClassName = `${item.header
-      .toLowerCase()
-      .replace(/\s/g, "-")}-pane`;
+    const { opened } = item;
 
     return (
-      <div className={containerClassName} key={i}>
-        <div className="_header" onClick={() => this.handleHeaderClick(i)}>
-          <Svg name="arrow" className={opened[i] ? "expanded" : ""} />
+      <li role="listitem" className={item.className} key={i}>
+        <h2
+          className="_header"
+          tabIndex="0"
+          onKeyDown={e => this.onHandleHeaderKeyDown(e, i)}
+          onClick={() => this.handleHeaderClick(i)}
+        >
+          <Svg name="arrow" className={opened ? "expanded" : ""} />
           {item.header}
           {item.buttons ? (
-            <div className="header-buttons">{item.buttons}</div>
+            <div className="header-buttons" tabIndex="-1">
+              {item.buttons}
+            </div>
           ) : null}
-        </div>
-        {created[i] || opened[i] ? (
-          <div
-            className="_content"
-            style={{ display: opened[i] ? "block" : "none" }}
-          >
-            {createElement(item.component, item.componentProps || {})}
+        </h2>
+        {opened && (
+          <div className="_content">
+            {cloneElement(item.component, item.componentProps || {})}
           </div>
-        ) : null}
-      </div>
+        )}
+      </li>
     );
   };
-
   render() {
     return (
-      <div className="accordion">
+      <ul role="list" className="accordion">
         {this.props.items.map(this.renderContainer)}
-      </div>
+      </ul>
     );
   }
 }

@@ -1,8 +1,12 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
 import React, { Component } from "react";
-import { bindActionCreators } from "redux";
 import { connect } from "react-redux";
+import { Tab, Tabs, TabList, TabPanels } from "react-aria-components/src/tabs";
 import { formatKeyShortcut } from "../../utils/text";
 import actions from "../../actions";
 import {
@@ -10,7 +14,7 @@ import {
   getActiveSearch,
   getSelectedPrimaryPaneTab
 } from "../../selectors";
-import { isEnabled } from "devtools-config";
+import { features, prefs } from "../../utils/prefs";
 import "./Sources.css";
 import classnames from "classnames";
 
@@ -19,126 +23,109 @@ import SourcesTree from "./SourcesTree";
 
 import type { SourcesMap } from "../../reducers/types";
 
-type Props = {
-  selectedTab: string,
-  setPrimaryPaneTab: string => void,
-  sources: SourcesMap,
-  selectSource: (string, Object) => void,
-  horizontal: boolean,
-  setActiveSearch: string => void,
-  closeActiveSearch: () => void,
-  sourceSearchOn: boolean
+type State = {
+  alphabetizeOutline: boolean
 };
 
-class PrimaryPanes extends Component<Props> {
-  renderShortcut: Function;
-  selectedPane: String;
-  showPane: Function;
-  renderTabs: Function;
-  renderChildren: Function;
+type Props = {
+  selectedTab: string,
+  sources: SourcesMap,
+  horizontal: boolean,
+  sourceSearchOn: boolean,
+  setPrimaryPaneTab: string => void,
+  setActiveSearch: string => void,
+  closeActiveSearch: () => void
+};
 
+class PrimaryPanes extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
 
-    this.renderShortcut = this.renderShortcut.bind(this);
-    this.showPane = this.showPane.bind(this);
-    this.renderTabs = this.renderTabs.bind(this);
+    this.state = {
+      alphabetizeOutline: prefs.alphabetizeOutline
+    };
   }
 
-  showPane(selectedPane: string) {
+  showPane = (selectedPane: string) => {
     this.props.setPrimaryPaneTab(selectedPane);
-  }
+  };
+
+  onAlphabetizeClick = () => {
+    const alphabetizeOutline = !prefs.alphabetizeOutline;
+    prefs.alphabetizeOutline = alphabetizeOutline;
+    this.setState({ alphabetizeOutline });
+  };
+
+  onActivateTab = (index: number) => {
+    if (index === 0) {
+      this.showPane("sources");
+    } else {
+      this.showPane("outline");
+    }
+  };
 
   renderOutlineTabs() {
-    if (!isEnabled("outline")) {
+    if (!features.outline) {
       return;
     }
 
     const sources = formatKeyShortcut(L10N.getStr("sources.header"));
-
     const outline = formatKeyShortcut(L10N.getStr("outline.header"));
+    const isSources = this.props.selectedTab === "sources";
+    const isOutline = this.props.selectedTab === "outline";
 
     return [
-      <div
-        className={classnames("tab", {
-          active: this.props.selectedTab === "sources"
-        })}
-        onClick={() => this.showPane("sources")}
+      <Tab
+        className={classnames("tab sources-tab", { active: isSources })}
         key="sources-tab"
       >
         {sources}
-      </div>,
-      <div
-        className={classnames("tab", {
-          active: this.props.selectedTab === "outline"
-        })}
-        onClick={() => this.showPane("outline")}
+      </Tab>,
+      <Tab
+        className={classnames("tab outline-tab", { active: isOutline })}
         key="outline-tab"
       >
         {outline}
-      </div>
+      </Tab>
     ];
-  }
-
-  renderTabs() {
-    return (
-      <div className="source-outline-tabs">{this.renderOutlineTabs()}</div>
-    );
-  }
-
-  renderShortcut() {
-    if (this.props.horizontal) {
-      const onClick = () => {
-        if (this.props.sourceSearchOn) {
-          return this.props.closeActiveSearch();
-        }
-        this.props.setActiveSearch("source");
-      };
-      return (
-        <span className="sources-header-info" dir="ltr" onClick={onClick}>
-          {L10N.getFormatStr(
-            "sources.search",
-            formatKeyShortcut(L10N.getStr("sources.search.key2"))
-          )}
-        </span>
-      );
-    }
-  }
-
-  renderOutline() {
-    const { selectSource } = this.props;
-
-    const outlineComp = isEnabled("outline") ? (
-      <Outline selectSource={selectSource} />
-    ) : null;
-
-    return outlineComp;
-  }
-
-  renderSources() {
-    const { sources, selectSource } = this.props;
-    return <SourcesTree sources={sources} selectSource={selectSource} />;
   }
 
   render() {
     const { selectedTab } = this.props;
+    const activeIndex = selectedTab === "sources" ? 0 : 1;
 
     return (
-      <div className="sources-panel">
-        {this.renderTabs()}
-        {selectedTab === "sources"
-          ? this.renderSources()
-          : this.renderOutline()}
-      </div>
+      <Tabs
+        activeIndex={activeIndex}
+        className="sources-panel"
+        onActivateTab={this.onActivateTab}
+      >
+        <TabList className="source-outline-tabs">
+          {this.renderOutlineTabs()}
+        </TabList>
+        <TabPanels className="source-outline-panel" hasFocusableContent>
+          <SourcesTree />
+          <Outline
+            alphabetizeOutline={this.state.alphabetizeOutline}
+            onAlphabetizeClick={this.onAlphabetizeClick}
+          />
+        </TabPanels>
+      </Tabs>
     );
   }
 }
 
+const mapStateToProps = state => ({
+  selectedTab: getSelectedPrimaryPaneTab(state),
+  sources: getSources(state),
+  sourceSearchOn: getActiveSearch(state) === "source"
+});
+
 export default connect(
-  state => ({
-    selectedTab: getSelectedPrimaryPaneTab(state),
-    sources: getSources(state),
-    sourceSearchOn: getActiveSearch(state) === "source"
-  }),
-  dispatch => bindActionCreators(actions, dispatch)
+  mapStateToProps,
+  {
+    setPrimaryPaneTab: actions.setPrimaryPaneTab,
+    setActiveSearch: actions.setActiveSearch,
+    closeActiveSearch: actions.closeActiveSearch
+  }
 )(PrimaryPanes);

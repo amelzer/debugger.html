@@ -1,14 +1,13 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
-import PropTypes from "prop-types";
 import React, { Component } from "react";
-import { bindActionCreators } from "redux";
 import { connect } from "react-redux";
-import { createSelector } from "reselect";
 
-import { get } from "lodash";
-import type { Frame } from "debugger-html";
-import type { SourcesMap } from "../../../reducers/sources";
+import type { Frame, Why } from "../../../types";
 
 import FrameComponent from "./Frame";
 import Group from "./Group";
@@ -16,20 +15,15 @@ import Group from "./Group";
 import renderWhyPaused from "./WhyPaused";
 
 import actions from "../../../actions";
-import {
-  annotateFrame,
-  collapseFrames,
-  formatCopyName
-} from "../../../utils/frame";
+import { collapseFrames, formatCopyName } from "../../../utils/pause/frames";
 import { copyToTheClipboard } from "../../../utils/clipboard";
 
 import {
-  getFrames,
   getFrameworkGroupingState,
   getSelectedFrame,
-  getSourceInSources,
-  getSources,
-  getPause
+  isPaused as getIsPaused,
+  getCallStackFrames,
+  getPauseReason
 } from "../../../selectors";
 
 import type { LocalFrame } from "./types";
@@ -41,11 +35,14 @@ const NUM_FRAMES_SHOWN = 7;
 type Props = {
   frames: Array<Frame>,
   frameworkGroupingOn: boolean,
-  toggleFrameworkGrouping: Function,
   selectedFrame: Object,
+  why: Why,
   selectFrame: Function,
   toggleBlackBox: Function,
-  pause: Object
+  toggleFrameworkGrouping: Function,
+  disableFrameTruncate: boolean,
+  displayFullUrl: boolean,
+  getFrameTitle?: string => string
 };
 
 type State = {
@@ -60,19 +57,15 @@ class Frames extends Component<Props, State> {
   toggleFrameworkGrouping: Function;
   renderToggleButton: Function;
 
-  constructor(props) {
+  constructor(props: Props) {
     super(props);
 
     this.state = {
-      showAllFrames: false
+      showAllFrames: !!props.disableFrameTruncate
     };
-
-    this.toggleFramesDisplay = this.toggleFramesDisplay.bind(this);
-    this.copyStackTrace = this.copyStackTrace.bind(this);
-    this.toggleFrameworkGrouping = this.toggleFrameworkGrouping.bind(this);
   }
 
-  shouldComponentUpdate(nextProps, nextState) {
+  shouldComponentUpdate(nextProps: Props, nextState: State): boolean {
     const { frames, selectedFrame, frameworkGroupingOn } = this.props;
     const { showAllFrames } = this.state;
     return (
@@ -83,13 +76,13 @@ class Frames extends Component<Props, State> {
     );
   }
 
-  toggleFramesDisplay() {
-    this.setState({
-      showAllFrames: !this.state.showAllFrames
-    });
-  }
+  toggleFramesDisplay = (): void => {
+    this.setState(prevState => ({
+      showAllFrames: !prevState.showAllFrames
+    }));
+  };
 
-  collapseFrames(frames) {
+  collapseFrames(frames: Array<Frame>) {
     const { frameworkGroupingOn } = this.props;
     if (!frameworkGroupingOn) {
       return frames;
@@ -98,7 +91,7 @@ class Frames extends Component<Props, State> {
     return collapseFrames(frames);
   }
 
-  truncateFrames(frames) {
+  truncateFrames(frames: Array<Frame>): Array<Frame> {
     const numFramesToShow = this.state.showAllFrames
       ? frames.length
       : NUM_FRAMES_SHOWN;
@@ -106,23 +99,25 @@ class Frames extends Component<Props, State> {
     return frames.slice(0, numFramesToShow);
   }
 
-  copyStackTrace() {
+  copyStackTrace = () => {
     const { frames } = this.props;
     const framesToCopy = frames.map(f => formatCopyName(f)).join("\n");
     copyToTheClipboard(framesToCopy);
-  }
+  };
 
-  toggleFrameworkGrouping() {
+  toggleFrameworkGrouping = () => {
     const { toggleFrameworkGrouping, frameworkGroupingOn } = this.props;
     toggleFrameworkGrouping(!frameworkGroupingOn);
-  }
+  };
 
   renderFrames(frames: LocalFrame[]) {
     const {
       selectFrame,
       selectedFrame,
       toggleBlackBox,
-      frameworkGroupingOn
+      frameworkGroupingOn,
+      displayFullUrl,
+      getFrameTitle
     } = this.props;
 
     const framesOrGroups = this.truncateFrames(this.collapseFrames(frames));
@@ -142,6 +137,8 @@ class Frames extends Component<Props, State> {
                 selectedFrame={selectedFrame}
                 toggleBlackBox={toggleBlackBox}
                 key={String(frameOrGroup.id)}
+                displayFullUrl={displayFullUrl}
+                getFrameTitle={getFrameTitle}
               />
             ) : (
               <Group
@@ -153,6 +150,8 @@ class Frames extends Component<Props, State> {
                 selectedFrame={selectedFrame}
                 toggleBlackBox={toggleBlackBox}
                 key={frameOrGroup[0].id}
+                displayFullUrl={displayFullUrl}
+                getFrameTitle={getFrameTitle}
               />
             )
         )}
@@ -171,14 +170,16 @@ class Frames extends Component<Props, State> {
     }
 
     return (
-      <div className="show-more" onClick={this.toggleFramesDisplay}>
-        {buttonMessage}
+      <div className="show-more-container">
+        <button className="show-more" onClick={this.toggleFramesDisplay}>
+          {buttonMessage}
+        </button>
       </div>
     );
   }
 
   render() {
-    const { frames, pause } = this.props;
+    const { frames, disableFrameTruncate, why } = this.props;
 
     if (!frames) {
       return (
@@ -193,59 +194,32 @@ class Frames extends Component<Props, State> {
     return (
       <div className="pane frames">
         {this.renderFrames(frames)}
-        {renderWhyPaused({ pause })}
-        {this.renderToggleButton(frames)}
+        {renderWhyPaused(why)}
+        {disableFrameTruncate ? null : this.renderToggleButton(frames)}
       </div>
     );
   }
 }
 
-Frames.propTypes = {
-  frames: PropTypes.array,
-  frameworkGroupingOn: PropTypes.bool.isRequired,
-  toggleFrameworkGrouping: PropTypes.func.isRequired,
-  selectedFrame: PropTypes.object,
-  selectFrame: PropTypes.func.isRequired,
-  toggleBlackBox: PropTypes.func,
-  pause: PropTypes.object
-};
-
-function getSourceForFrame(sources, frame) {
-  return getSourceInSources(sources, frame.location.sourceId);
-}
-
-function appendSource(sources, frame) {
-  return Object.assign({}, frame, {
-    source: getSourceForFrame(sources, frame).toJS()
-  });
-}
-
-export function getAndProcessFrames(frames: Frame[], sources: SourcesMap) {
-  if (!frames) {
-    return null;
-  }
-
-  const processedFrames = frames
-    .filter(frame => getSourceForFrame(sources, frame))
-    .map(frame => appendSource(sources, frame))
-    .filter(frame => !get(frame, "source.isBlackBoxed"))
-    .map(annotateFrame);
-
-  return processedFrames;
-}
-
-const getAndProcessFramesSelector = createSelector(
-  getFrames,
-  getSources,
-  getAndProcessFrames
-);
+const mapStateToProps = state => ({
+  frames: getCallStackFrames(state),
+  why: getPauseReason(state),
+  frameworkGroupingOn: getFrameworkGroupingState(state),
+  selectedFrame: getSelectedFrame(state),
+  pause: getIsPaused(state)
+});
 
 export default connect(
-  state => ({
-    frames: getAndProcessFramesSelector(state),
-    frameworkGroupingOn: getFrameworkGroupingState(state),
-    selectedFrame: getSelectedFrame(state),
-    pause: getPause(state)
-  }),
-  dispatch => bindActionCreators(actions, dispatch)
+  mapStateToProps,
+  {
+    selectFrame: actions.selectFrame,
+    toggleBlackBox: actions.toggleBlackBox,
+    toggleFrameworkGrouping: actions.toggleFrameworkGrouping,
+    disableFrameTruncate: false,
+    displayFullUrl: false
+  }
 )(Frames);
+
+// Export the non-connected component in order to use it outside of the debugger
+// panel (e.g. console, netmonitor, …).
+export { Frames };

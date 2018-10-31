@@ -1,121 +1,113 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 import { Component } from "react";
-import { markText, toEditorPosition } from "../../utils/editor";
-import { getDocument } from "../../utils/editor/source-documents";
-
+import {
+  toEditorPosition,
+  getDocument,
+  hasDocument,
+  startOperation,
+  endOperation
+} from "../../utils/editor";
+import { isLoaded } from "../../utils/source";
+import { isException } from "../../utils/pause";
+import { getIndentation } from "../../utils/indentation";
 import { connect } from "react-redux";
 import {
-  getSelectedLocation,
-  getSelectedFrame,
-  getPause
+  getVisibleSelectedFrame,
+  getPauseReason,
+  getSelectedSource
 } from "../../selectors";
 
-type Props = {
-  editor: Object,
-  selectedFrame: Object,
-  selectedLocation: Object,
-  pauseInfo: Object
-};
+import type { Frame, Why, Source } from "../../types";
 
-type State = {
-  debugExpression: {
-    clear: Function
-  }
+type Props = {
+  selectedFrame: Frame,
+  why: Why,
+  selectedSource: Source
 };
 
 type TextClasses = {
   markTextClass: string,
   lineClass: string
 };
-export class DebugLine extends Component<Props, State> {
-  constructor() {
-    super();
-    this.state = { debugExpression: { clear: () => {} } };
+
+function isDocumentReady(selectedSource, selectedFrame) {
+  return (
+    selectedFrame &&
+    isLoaded(selectedSource) &&
+    hasDocument(selectedFrame.location.sourceId)
+  );
+}
+
+export class DebugLine extends Component<Props> {
+  debugExpression: null;
+
+  componentDidUpdate(prevProps: Props) {
+    const { why, selectedFrame, selectedSource } = this.props;
+
+    startOperation();
+    this.clearDebugLine(
+      prevProps.selectedFrame,
+      prevProps.selectedSource,
+      prevProps.why
+    );
+    this.setDebugLine(why, selectedFrame, selectedSource);
+    endOperation();
   }
 
   componentDidMount() {
-    this.setDebugLine(
-      this.props.pauseInfo,
-      this.props.selectedFrame,
-      this.props.selectedLocation,
-      this.props.editor
-    );
+    const { why, selectedFrame, selectedSource } = this.props;
+    this.setDebugLine(why, selectedFrame, selectedSource);
   }
 
-  componentWillReceiveProps(nextProps: Props) {
-    this.clearDebugLine(this.props.selectedFrame, this.props.editor);
-    this.setDebugLine(
-      nextProps.pauseInfo,
-      nextProps.selectedFrame,
-      nextProps.selectedLocation,
-      nextProps.editor
-    );
-  }
-
-  componentWillUnmount() {
-    this.clearDebugLine(this.props.selectedFrame, this.props.editor);
-  }
-
-  setDebugLine(
-    pauseInfo: Object,
-    selectedFrame: Object,
-    selectedLocation: Object,
-    editor: Object
-  ) {
-    if (!selectedFrame) {
+  setDebugLine(why: Why, selectedFrame: Frame, selectedSource: Source) {
+    if (!isDocumentReady(selectedSource, selectedFrame)) {
       return;
     }
-
-    const { location, location: { sourceId } } = selectedFrame;
+    const sourceId = selectedFrame.location.sourceId;
     const doc = getDocument(sourceId);
-    if (!doc) {
-      return;
-    }
 
-    const { line, column } = toEditorPosition(sourceId, location);
-
-    // make sure the line is visible
-    if (editor && editor.alignLine) {
-      editor.alignLine(line);
-    }
-
-    const { markTextClass, lineClass } = this.getTextClasses(pauseInfo);
+    let { line, column } = toEditorPosition(selectedFrame.location);
+    const { markTextClass, lineClass } = this.getTextClasses(why);
     doc.addLineClass(line, "line", lineClass);
 
-    const debugExpression = markText(editor, markTextClass, {
-      start: { line, column },
-      end: { line, column: null }
-    });
-    this.setState({ debugExpression });
+    const lineText = doc.getLine(line);
+    column = Math.max(column, getIndentation(lineText));
+
+    this.debugExpression = doc.markText(
+      { ch: column, line },
+      { ch: null, line },
+      { className: markTextClass }
+    );
   }
 
-  clearDebugLine(selectedFrame: Object, editor: Object) {
-    if (!selectedFrame) {
+  clearDebugLine(selectedFrame: Frame, selectedSource: Source, why: Why) {
+    if (!isDocumentReady(selectedSource, selectedFrame)) {
       return;
     }
-    const { line, sourceId } = selectedFrame.location;
-    const { debugExpression } = this.state;
-    if (debugExpression) {
-      debugExpression.clear();
+
+    if (this.debugExpression) {
+      this.debugExpression.clear();
     }
 
-    const editorLine = line - 1;
+    const sourceId = selectedFrame.location.sourceId;
+    const { line } = toEditorPosition(selectedFrame.location);
     const doc = getDocument(sourceId);
-    if (!doc) {
-      return;
-    }
-
-    doc.removeLineClass(editorLine, "line", "new-debug-line");
-    doc.removeLineClass(editorLine, "line", "new-debug-line-error");
+    const { lineClass } = this.getTextClasses(why);
+    doc.removeLineClass(line, "line", lineClass);
   }
 
-  getTextClasses(pauseInfo: Object): TextClasses {
-    if (pauseInfo && pauseInfo.why.type === "exception") {
+  getTextClasses(why: Why): TextClasses {
+    if (isException(why)) {
       return {
         markTextClass: "debug-expression-error",
         lineClass: "new-debug-line-error"
       };
     }
+
     return { markTextClass: "debug-expression", lineClass: "new-debug-line" };
   }
 
@@ -124,8 +116,10 @@ export class DebugLine extends Component<Props, State> {
   }
 }
 
-export default connect(state => ({
-  selectedLocation: getSelectedLocation(state),
-  selectedFrame: getSelectedFrame(state),
-  pauseInfo: getPause(state)
-}))(DebugLine);
+const mapStateToProps = state => ({
+  selectedFrame: getVisibleSelectedFrame(state),
+  selectedSource: getSelectedSource(state),
+  why: getPauseReason(state)
+});
+
+export default connect(mapStateToProps)(DebugLine);

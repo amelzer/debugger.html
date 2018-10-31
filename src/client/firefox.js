@@ -1,13 +1,25 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
 import { setupCommands, clientCommands } from "./firefox/commands";
 import { setupEvents, clientEvents } from "./firefox/events";
 import { features } from "../utils/prefs";
+import type { Grip } from "../types";
+let DebuggerClient;
+
+function createObjectClient(grip: Grip) {
+  return DebuggerClient.createObjectClient(grip);
+}
 
 export async function onConnect(connection: any, actions: Object): Object {
   const {
     tabConnection: { tabTarget, threadClient, debuggerClient }
   } = connection;
+
+  DebuggerClient = debuggerClient;
 
   if (!tabTarget || !threadClient || !debuggerClient) {
     return { bpClients: {} };
@@ -35,19 +47,6 @@ export async function onConnect(connection: any, actions: Object): Object {
     wasmBinarySource: supportsWasm
   });
 
-  // NOTE: The Worker and Browser Content toolboxes do not have a parent
-  // with a listWorkers function
-  // TODO: there is a listWorkers property, but it is not a function on the
-  // parent. Investigate what it is
-  if (
-    threadClient._parent &&
-    typeof threadClient._parent.listWorkers === "function"
-  ) {
-    threadClient._parent
-      .listWorkers()
-      .then(workers => actions.setWorkers(workers));
-  }
-
   // In Firefox, we need to initially request all of the sources. This
   // usually fires off individual `newSource` notifications as the
   // debugger finds them, but there may be existing sources already in
@@ -55,7 +54,11 @@ export async function onConnect(connection: any, actions: Object): Object {
   // bfcache) so explicity fire `newSource` events for all returned
   // sources.
   const sources = await clientCommands.fetchSources();
-  actions.connect(tabTarget.url);
+  const traits = tabTarget.activeTab ? tabTarget.activeTab.traits : null;
+  await actions.connect(
+    tabTarget.url,
+    traits && traits.canRewind
+  );
   await actions.newSources(sources);
 
   // If the threadClient is already paused, make sure to show a
@@ -68,4 +71,4 @@ export async function onConnect(connection: any, actions: Object): Object {
   return { bpClients };
 }
 
-export { clientCommands, clientEvents };
+export { createObjectClient, clientCommands, clientEvents };

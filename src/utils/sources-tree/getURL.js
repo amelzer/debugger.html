@@ -1,7 +1,20 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
-import { parse } from "url";
-import { merge } from "lodash";
+import { parse } from "../../utils/url";
+import { getUnicodeHostname, getUnicodeUrlPath } from "devtools-modules";
+
+import type { Source } from "../../types";
+export type ParsedURL = {
+  path: string,
+  group: string,
+  filename: string
+};
+
+const urlMap: WeakMap<Source, ParsedURL> = new WeakMap();
 
 export function getFilenameFromPath(pathname?: string) {
   let filename = "";
@@ -15,73 +28,101 @@ export function getFilenameFromPath(pathname?: string) {
   return filename;
 }
 
-export function getURL(
-  sourceUrl: string,
-  debuggeeUrl: string = ""
-): { path: string, group: string } {
-  const url = sourceUrl;
-  const def = { path: "", group: "", filename: "" };
+const NoDomain = "(no domain)";
+const def = { path: "", group: "", filename: "" };
+
+function _getURL(source: Source, defaultDomain: string): ParsedURL {
+  const { url } = source;
   if (!url) {
     return def;
   }
 
-  const { pathname, protocol, host, path } = parse(url);
-  const defaultDomain = parse(debuggeeUrl).host;
-  const filename = getFilenameFromPath(pathname);
+  const { pathname, protocol, host } = parse(url);
+  const filename = getUnicodeUrlPath(getFilenameFromPath(pathname));
 
   switch (protocol) {
     case "javascript:":
       // Ignore `javascript:` URLs for now
       return def;
 
+    case "moz-extension:":
+    case "resource:":
+      return {
+        ...def,
+        path: pathname,
+        filename,
+        group: `${protocol}//${host || ""}`
+      };
+
     case "webpack:":
-      // A Webpack source is a special case
-      return merge(def, {
-        path: path,
-        group: "Webpack",
-        filename: filename
-      });
+    case "ng:":
+      return {
+        ...def,
+        path: pathname,
+        filename,
+        group: `${protocol}//`
+      };
 
     case "about:":
       // An about page is a special case
-      return merge(def, {
+      return {
+        ...def,
         path: "/",
-        group: url,
-        filename: filename
-      });
+        filename,
+        group: url
+      };
 
-    case null:
+    case "data:":
+      return {
+        ...def,
+        path: "/",
+        group: NoDomain,
+        filename: url
+      };
+
+    case "":
       if (pathname && pathname.startsWith("/")) {
-        // If it's just a URL like "/foo/bar.js", resolve it to the file
-        // protocol
-        return merge(def, {
-          path: path,
-          group: "file://",
-          filename: filename
-        });
-      } else if (host === null) {
-        // We don't know what group to put this under, and it's a script
-        // with a weird URL. Just group them all under an anonymous group.
-        return merge(def, {
+        // use file protocol for a URL like "/foo/bar.js"
+        return {
+          ...def,
+          path: pathname,
+          filename,
+          group: "file://"
+        };
+      } else if (!host) {
+        return {
+          ...def,
           path: url,
-          group: defaultDomain,
-          filename: filename
-        });
+          group: defaultDomain || "",
+          filename
+        };
       }
       break;
 
     case "http:":
     case "https:":
-      return merge(def, {
+      return {
+        ...def,
         path: pathname,
-        group: host,
-        filename: filename
-      });
+        filename,
+        group: getUnicodeHostname(host)
+      };
   }
 
-  return merge(def, {
-    path: path,
+  return {
+    ...def,
+    path: pathname,
     group: protocol ? `${protocol}//` : "",
-    filename: filename
-  });
+    filename
+  };
+}
+
+export function getURL(source: Source, debuggeeUrl: ?string) {
+  if (urlMap.has(source)) {
+    return urlMap.get(source) || def;
+  }
+
+  const url = _getURL(source, debuggeeUrl || "");
+  urlMap.set(source, url);
+  return url;
 }

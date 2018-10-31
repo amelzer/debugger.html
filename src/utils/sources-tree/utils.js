@@ -1,14 +1,19 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
-import { parse } from "url";
+import { parse } from "../../utils/url";
 
-import type { Node } from "./types";
-import type { SourceRecord } from "../../reducers/types";
+import type { TreeNode, TreeSource, TreeDirectory, ParentMap } from "./types";
+import type { Source } from "../../types";
 import { isPretty } from "../source";
+import { getURL } from "./getURL";
 const IGNORED_URLS = ["debugger eval code", "XStringBundle"];
 
-export function nodeHasChildren(item: Node): boolean {
-  return Array.isArray(item.contents);
+export function nodeHasChildren(item: TreeNode): boolean {
+  return Array.isArray(item.contents) && item.type === "directory";
 }
 
 export function isExactUrlMatch(pathPart: string, debuggeeUrl: string) {
@@ -20,34 +25,50 @@ export function isExactUrlMatch(pathPart: string, debuggeeUrl: string) {
   return host.replace(/^www\./, "") === pathPart.replace(/^www\./, "");
 }
 
-export function isDirectory(url: Object) {
-  const parts = url.path.split("/").filter(p => p !== "");
-
+export function isPathDirectory(path: string) {
   // Assume that all urls point to files except when they end with '/'
   // Or directory node has children
+  const parts = path.split("/").filter(p => p !== "");
+  return parts.length === 0 || path.slice(-1) === "/";
+}
+
+export function isDirectory(item: TreeNode) {
   return (
-    parts.length === 0 || url.path.slice(-1) === "/" || nodeHasChildren(url)
+    (isPathDirectory(item.path) || item.type === "directory") &&
+    item.name != "(index)"
   );
 }
 
-export function isNotJavaScript(source: Object): boolean {
-  const parsedUrl = parse(source.url).pathname;
-  if (!parsedUrl) {
-    return false;
+export function getSourceFromNode(item: TreeNode): ?Source {
+  const { contents } = item;
+  if (!isDirectory(item) && !Array.isArray(contents)) {
+    return contents;
   }
-  const parsedExtension = parsedUrl.split(".").pop();
-
-  return ["css", "svg", "png"].includes(parsedExtension);
 }
 
-export function isInvalidUrl(url: Object, source: Object) {
+export function isSource(item: TreeNode) {
+  return item.type === "source";
+}
+
+export function getFileExtension(source: Source): string {
+  const parsedUrl = getURL(source).path;
+  if (!parsedUrl) {
+    return "";
+  }
+  return parsedUrl.split(".").pop();
+}
+
+export function isNotJavaScript(source: Source): boolean {
+  return ["css", "svg", "png"].includes(getFileExtension(source));
+}
+
+export function isInvalidUrl(url: Object, source: Source) {
   return (
     IGNORED_URLS.indexOf(url) != -1 ||
-    !source.get("url") ||
-    source.get("loadedState") === "loading" ||
+    !source.url ||
     !url.group ||
-    isPretty(source.toJS()) ||
-    isNotJavaScript(source.toJS())
+    isPretty(source) ||
+    isNotJavaScript(source)
   );
 }
 
@@ -56,23 +77,37 @@ export function partIsFile(index: number, parts: Array<string>, url: Object) {
   return !isDirectory(url) && isLastPart;
 }
 
-export function createNode(
+export function createDirectoryNode(
   name: string,
   path: string,
-  contents: SourceRecord | Array<Node>
-): Node {
+  contents: TreeNode[]
+): TreeDirectory {
   return {
+    type: "directory",
     name,
     path,
     contents
   };
 }
 
-export function createParentMap(tree: Node): WeakMap<Node, Node> {
+export function createSourceNode(
+  name: string,
+  path: string,
+  contents: Source
+): TreeSource {
+  return {
+    type: "source",
+    name,
+    path,
+    contents
+  };
+}
+
+export function createParentMap(tree: TreeNode): ParentMap {
   const map = new WeakMap();
 
   function _traverse(subtree) {
-    if (nodeHasChildren(subtree)) {
+    if (subtree.type === "directory") {
       for (const child of subtree.contents) {
         map.set(child, subtree);
         _traverse(child);
@@ -80,9 +115,12 @@ export function createParentMap(tree: Node): WeakMap<Node, Node> {
     }
   }
 
-  // Don't link each top-level path to the "root" node because the
-  // user never sees the root
-  tree.contents.forEach(_traverse);
+  if (tree.type === "directory") {
+    // Don't link each top-level path to the "root" node because the
+    // user never sees the root
+    tree.contents.forEach(_traverse);
+  }
+
   return map;
 }
 

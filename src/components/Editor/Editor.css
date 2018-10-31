@@ -1,19 +1,28 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 .editor-wrapper {
   --debug-line-border: rgb(145, 188, 219);
   --debug-expression-background: rgba(202, 227, 255, 0.5);
   --editor-searchbar-height: 27px;
-  --editor-second-searchbar-height: 27px;
   --debug-line-error-border: rgb(255, 0, 0);
   --debug-expression-error-background: rgba(231, 116, 113, 0.3);
+  --editor-header-height: 30px;
 }
 
 .theme-dark .editor-wrapper {
-  --debug-expression-background: #54617e;
+  --debug-expression-background: rgba(202, 227, 255, 0.3);
   --debug-line-border: #7786a2;
 }
 
 .editor-wrapper .CodeMirror-linewidget {
   margin-right: -7px;
+  overflow: hidden;
+}
+
+.editor-wrapper {
+  min-width: 0 !important;
 }
 
 .theme-dark {
@@ -30,15 +39,51 @@
  */
 .editor-wrapper {
   position: absolute;
-  height: calc(100% - 29px);
+  height: calc(100% - var(--editor-header-height));
   width: calc(100% - 1px);
-  top: 29px;
+  top: var(--editor-header-height);
   left: 0px;
   --editor-footer-height: 24px;
 }
 
 html[dir="rtl"] .editor-mount {
   direction: ltr;
+}
+
+.theme-light {
+  --gutter-hover-background-color: #dde1e4;
+}
+
+.theme-dark {
+  --gutter-hover-background-color: #414141;
+}
+
+:not(.empty-line):not(.new-breakpoint)
+  > .CodeMirror-gutter-wrapper:hover
+  > .CodeMirror-linenumber {
+  height: 13px;
+  color: var(--theme-body-color);
+  /* Add 1px offset to the background to match it
+    with the actual breakpoint image dimensions */
+  background: linear-gradient(
+    to bottom,
+    transparent 1px,
+    var(--gutter-hover-background-color) 0
+  );
+}
+
+:not(.empty-line):not(.new-breakpoint)
+  > .CodeMirror-gutter-wrapper:hover
+  > .CodeMirror-linenumber::after {
+  content: "";
+  position: absolute;
+  top: 1px;
+  height: 12px;
+  width: 9px;
+  background-color: var(--gutter-hover-background-color);
+  mask: url(/images/breakpoint.svg) no-repeat;
+  mask-size: auto 12px;
+  mask-position: right;
 }
 
 .editor-wrapper .breakpoints {
@@ -88,6 +133,11 @@ html[dir="rtl"] .editor-mount {
   border: 1px solid #00b6ff;
 }
 
+.editor .breakpoint {
+  position: absolute;
+  right: -2px;
+}
+
 .editor.new-breakpoint.folding-enabled svg {
   right: -16px;
 }
@@ -132,7 +182,10 @@ html[dir="rtl"] .editor-mount {
 }
 
 /* set the linenumber white when there is a breakpoint */
-.new-breakpoint .CodeMirror-gutter-wrapper .CodeMirror-linenumber {
+.cm-s-mozilla
+  .new-breakpoint
+  .CodeMirror-gutter-wrapper
+  .CodeMirror-linenumber {
   color: white;
 }
 
@@ -146,7 +199,7 @@ html[dir="rtl"] .editor-mount {
 }
 
 .theme-dark .editor-wrapper .CodeMirror-line .cm-comment {
-  color: var(--theme-content-color3);
+  color: var(--theme-comment);
 }
 
 .debug-expression {
@@ -198,7 +251,7 @@ debug-expression-error {
 
 @keyframes fade-highlight-out-dark {
   0% {
-    background-color: var(--theme-content-color3);
+    background-color: var(--theme-comment);
   }
   100% {
     background-color: transparent;

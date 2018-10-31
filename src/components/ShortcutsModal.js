@@ -1,4 +1,9 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
+
 import React, { Component } from "react";
 import Modal from "./shared/Modal";
 import classnames from "classnames";
@@ -66,20 +71,24 @@ export class ShortcutsModal extends Component<Props> {
     return (
       <ul className="shortcuts-list">
         {this.renderShorcutItem(
-          L10N.getStr("shortcuts.fileSearch"),
+          L10N.getStr("shortcuts.fileSearch2"),
           formatKeyShortcut(L10N.getStr("sources.search.key2"))
         )}
         {this.renderShorcutItem(
-          L10N.getStr("shortcuts.searchAgain"),
+          L10N.getStr("shortcuts.searchAgain2"),
           formatKeyShortcut(L10N.getStr("sourceSearch.search.again.key2"))
         )}
         {this.renderShorcutItem(
-          L10N.getStr("shortcuts.projectSearch"),
+          L10N.getStr("shortcuts.projectSearch2"),
           formatKeyShortcut(L10N.getStr("projectTextSearch.key"))
         )}
         {this.renderShorcutItem(
-          L10N.getStr("shortcuts.functionSearch"),
+          L10N.getStr("shortcuts.functionSearch2"),
           formatKeyShortcut(L10N.getStr("functionSearch.key"))
+        )}
+        {this.renderShorcutItem(
+          L10N.getStr("shortcuts.gotoLine"),
+          formatKeyShortcut(L10N.getStr("gotoLineModal.key2"))
         )}
       </ul>
     );

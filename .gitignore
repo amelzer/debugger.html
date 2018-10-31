@@ -1,11 +1,10 @@
 .DS_Store
-build
+/assets/build
 node_modules
 configs/local.json
 npm-debug.log
 assets-error.log
 .idea/
-.vscode/
 /firefox
 lerna-debug.log
 assets-error.log
@@ -19,3 +18,9 @@ tags
 **/*.swp
 **/*.orig
 *~
+webpack-stats/
+package-lock.json
+out
+junit.xml
+.cache/
+.rpt2_cache

@@ -14,15 +14,27 @@
 **Components**
 
 Issues are organized in terms of components.
-Issue titles should include a component at the front e.g. `[Editor]`
+Issue titles should include the name of the component as a tag
+at the very beginning. Consider the following titles:
 
-|Editor|SecondaryPanes|UI|Other|
-|----------|------|-----|----|
-|Editor|CommandBar|SourceTree|Accessibility|
-|SourceTabs|WatchExpressions|SourcesSearch|Theme|
-|SearchBar|Breakpoints|WelcomePane|Reducer|
-|SourceFooter|CallStack||Action|
-||Scopes|||RTL|
+* Bad: `Fix input field padding of search bar`  
+* Good: `[SearchBar] Fix input field padding`
+
+or
+
+* Bad: `Add information about titles to documentation`  
+* Good: `[Docs] Add information about titles`
+
+Some common tags include:
+
+|Editor|SecondaryPanes|UI|Other| 
+|----------|------|-----|----| 
+|Editor|CommandBar|SourceTree|Accessibility| 
+|SourceTabs|WatchExpressions|TextSearch|Theme| 
+|SearchBar|Breakpoints|WelcomeBox|Reducer| 
+|SourceFooter|CallStack||Action| 
+||Scopes||Docs|RTL|
+
 
 **User Perspective**
 
@@ -91,7 +103,7 @@ Include screenshots and animated GIFs in your pull request whenever possible.
 If you'd like to work on an issue, `/claim` it in the issue and it'll be marked `in-progress`.
 
 * We'll check up regularly to see how it's progressing and if we can help
-* Don't hesitate to ask questions on the issue or in our slack channel. Communication is the most important part. Don't worry about over communicating!
+* Don't hesitate to ask questions on the issue or in our Slack channel. Communication is the most important part. Don't worry about over communicating!
 * Don't feel bad taking yourself off the issue if you no longer have the time or interest in the issue.
 
 
@@ -112,8 +124,8 @@ These are the [labels](https://github.com/devtools-html/debugger.html/labels) we
 | `difficulty:hard` | [search][labels-difficulty-hard] | Work that requires new tests, new code, and a good understanding of project; expect lots of review |
 | `docs` | [search][labels-docs] | Issues with our documentation |
 | `design` | [search][labels-design] | Issues that require design work |
-| `enhancement` | [search][labels-enhancement] | [Requests](../CONTRIBUTING.md#suggesting-enhancements-new) for features |
-| `bug` | [search][labels-bug] | [Reported Bugs](../CONTRIBUTING.md#reporting-bugs-bug) with the current code |
+| `enhancement` | [search][labels-enhancement] | [Requests](../.github/CONTRIBUTING.md#suggesting-enhancements-new) for features |
+| `bug` | [search][labels-bug] | [Reported Bugs](../.github/CONTRIBUTING.md#reporting-bugs-bug) with the current code |
 | `chrome` | [search][labels-chrome] | Chrome only issues |
 | `firefox` | [search][labels-firefox] | Firefox only issues |
 | `infrastructure` | [search][labels-infrastructure] | Issues with testing / build infrastructure |
@@ -166,7 +178,7 @@ a triaged issue is:
   *or* has a request for more information
   *or* has a clear next step
 
-An issue that does not fullfill those traits should probably be moved to one of the boards and
+An issue that does not fulfill those traits should probably be moved to one of the boards and
 closed.
 
 ### Issue Organization
@@ -190,8 +202,8 @@ We focus on being community friendly for many reasons.
 [labels-available]:https://github.com/devtools-html/debugger.html/labels/available
 [labels-first-timers-only]:https://github.com/devtools-html/debugger.html/labels/first-timers-only
 [labels-difficulty-easy]:https://github.com/devtools-html/debugger.html/labels/difficulty%3A%20easy
-[labels-difficulty-medium]:https://github.com/devtools-html/debugger.html/labels/difficulty%3A%medium
-[labels-difficulty-hard]:https://github.com/devtools-html/debugger.html/labels/difficulty%3A%hard
+[labels-difficulty-medium]:https://github.com/devtools-html/debugger.html/labels/difficulty%3A%20medium
+[labels-difficulty-hard]:https://github.com/devtools-html/debugger.html/labels/difficulty%3A%20hard
 [labels-docs]:https://github.com/devtools-html/debugger.html/labels/docs
 [labels-design]:https://github.com/devtools-html/debugger.html/labels/design
 [labels-enhancement]:https://github.com/devtools-html/debugger.html/labels/enhancement

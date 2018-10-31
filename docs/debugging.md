@@ -1,10 +1,10 @@
 ## Debugging Tips
 
-+ [Components](#components)
-+ [Actions](#actions)
-+ [Reducers](#reducers)
-+ [Client](#client)
-+ [Communication](#communication)
+* [Components](#components)
+* [Actions](#actions)
+* [Reducers](#reducers)
+* [Client](#client)
+* [Communication](#communication)
 
 The best thing about React and Redux is that it simplifies the development workflow.
 
@@ -35,35 +35,35 @@ A good place to start is logging. You can log the Debugger's actions by enabling
 
 Once you've narrowed the question down to an action you can debug it either in the console or unit tests.
 
-It's easy to try invoking an action in the console with the `getGlobalsForTesting` helper:
+It's easy to try invoking an action in the console with the *dbg* helper:
 
 ```js
-getGlobalsForTesting().actions.selectSource()
+dbg.actions.selectLocation();
 ```
 
 We have unit tests for several of our actions in `src/actions/tests`.
-It's nice to look at the unit tests to see how an action *should* be called. If you don't see the use case you're looking for, add a unit test to try it out. Once you get it working you can PR the new unit test and everyone benefits :)
+It's nice to look at the unit tests to see how an action _should_ be called. If you don't see the use case you're looking for, add a unit test to try it out. Once you get it working you can PR the new unit test and everyone benefits :)
 
 ![redux-dt]
 
 ### Reducers
 
 It's really common to want to know what data the Debugger has.
-For instance, what does a breakpoint look like?
-In Redux, the reducers are like the application database and it's tremendously useful to be able to inspect them.
+For instance, what does a breakpoint look like? In Redux, the reducers are like the application database and it's tremendously useful to be able to inspect them.
 
 It's easy to view the current Debugger state in the console with
-the `appStore` global. Because the data is immutable, you'll need to request the state each time you want to see it.
+the `dbg` global. Because the store is immutable, you'll need to request the state each time you want to see it.
 
 ```js
-appStore.getState().sources.toJS()
+dbg.store.getState().sources.toJS();
 ```
 
-You can also test out a selector in the console with the `getGlobalsForTesting` helper:
+You can also test out a selector in the console with the `dbg helper:
 
 ```js
-getGlobalsForTesting().selectors.getBreakpoints(appStore.getState())
+dbg.selectors.getBreakpoints();
 ```
+
 
 ### Client
 
@@ -75,8 +75,8 @@ To answer these questions, you need to look at the Debugger's client, which talk
 The client commands are available on the console at `client` for testing purposes:
 
 ```js
-client.setBreakpoint(...) // will add a breakpoint
-client.resume() // will resume when paused
+dbg.client.setBreakpoint(...) // will add a breakpoint
+dbg.client.resume() // will resume when paused
 ```
 
 The best way to see what the client does is the view the communication over the websocket.
@@ -94,18 +94,23 @@ Here's a sample of some websocket frames from the Debugger attaching:
 {"to":"server2.conn7.child1/29","type":"source"}
 ```
 
+Chrome has a useful websocket monitor for viewing the communication:
+
+![ws]
+
+[ws]: https://shipusercontent.com/c96820fcf108cd3b17a4dcee1222a740/Screen%20Shot%202018-02-02%20at%207.11.33%20PM.png
+
 ### Communication
 
-Lastly, it's worth mentioning that Developer Tools is an *advanced* subject
+Lastly, it's worth mentioning that Developer Tools are an _advanced_ subject
 you're actually inquiring into how JS works. It's awesome that you're curious and there
-are lots of people in our [slack] channel who are learning alongside of you.
+are lots of people in our [Slack][slack] channel who are learning alongside of you.
 
-The best thing to do is to join our slack and share what you're learning and ask others questions.
+The best thing to do is to join our Slack and share what you're learning and ask others questions.
 They'll be plenty of people who are curious and happy to share what they know.
 Also, down the road, this is a subject that plenty of people are interested in learning and great fodder for [talks].
 
 [slack]: https://devtools-html-slack.herokuapp.com/
-[talks]: ../CONTRIBUTING.md#give-a-talk-speech_balloon
-
+[talks]: ../.github/CONTRIBUTING.md#give-a-talk-speech_balloon
 [react-dt]: https://cloud.githubusercontent.com/assets/254562/25345125/2cdc225e-28e2-11e7-9642-c7ead9916218.png
 [redux-dt]: https://cloud.githubusercontent.com/assets/254562/25345124/2cd6cf8e-28e2-11e7-8d4a-00a566240e74.png

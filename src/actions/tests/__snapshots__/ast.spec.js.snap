@@ -40,67 +40,16 @@ Array [
 ]
 `;
 
-exports[`ast setEmptyLines scopes 1`] = `
+exports[`ast setPausePoints scopes 1`] = `
 Array [
   1,
   2,
+  6,
   7,
+  10,
+  11,
   12,
 ]
-`;
-
-exports[`ast setPreview member expression 1`] = `
-Object {
-  "cursorPos": undefined,
-  "expression": "this.bazz",
-  "extra": undefined,
-  "location": Object {
-    "end": Object {
-      "column": 37,
-      "line": 1,
-    },
-    "start": Object {
-      "column": 33,
-      "line": 1,
-    },
-  },
-  "result": Object {
-    "actor": "bazz",
-    "preview": Object {},
-  },
-  "tokenPos": Object {
-    "column": 34,
-    "line": 1,
-  },
-  "updating": false,
-}
-`;
-
-exports[`ast setPreview this 1`] = `
-Object {
-  "cursorPos": undefined,
-  "expression": "this",
-  "extra": undefined,
-  "location": Object {
-    "end": Object {
-      "column": 32,
-      "line": 1,
-    },
-    "start": Object {
-      "column": 28,
-      "line": 1,
-    },
-  },
-  "result": Object {
-    "actor": "this",
-    "preview": Object {},
-  },
-  "tokenPos": Object {
-    "column": 30,
-    "line": 1,
-  },
-  "updating": false,
-}
 `;
 
 exports[`ast setSymbols when the source is loaded should be able to set symbols 1`] = `
@@ -144,6 +93,8 @@ Object {
       ],
     },
   ],
+  "hasJsx": false,
+  "hasTypes": false,
   "identifiers": Array [
     Object {
       "expression": "base",
@@ -175,6 +126,8 @@ Object {
     },
   ],
   "imports": Array [],
+  "literals": Array [],
+  "loading": false,
   "memberExpressions": Array [],
   "objectProperties": Array [],
   "variables": Array [

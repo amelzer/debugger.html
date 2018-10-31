@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
 import { getBreakpoint } from "../../selectors";
@@ -11,7 +15,7 @@ import type {
   PendingLocation,
   Breakpoint,
   PendingBreakpoint
-} from "debugger-html";
+} from "../../types";
 
 import type { State } from "../../reducers/types";
 
@@ -36,6 +40,11 @@ export function makeLocationId(location: Location) {
   const { sourceId, line, column } = location;
   const columnString = column || "";
   return `${sourceId}:${line}:${columnString}`;
+}
+
+export function getLocationWithoutColumn(location: Location) {
+  const { sourceId, line } = location;
+  return `${sourceId}:${line}`;
 }
 
 export function makePendingLocationId(location: Location) {
@@ -103,25 +112,52 @@ export function breakpointExists(state: State, location: Location) {
   return currentBp && !currentBp.disabled;
 }
 
-export function createBreakpoint(location: Location, overrides: Object = {}) {
+export function createBreakpoint(
+  location: Location,
+  overrides: Object = {}
+): Breakpoint {
   const {
     condition,
     disabled,
     hidden,
     generatedLocation,
-    astLocation
+    astLocation,
+    id,
+    text,
+    originalText
   } = overrides;
 
+  const defaultASTLocation = { name: undefined, offset: location };
   const properties = {
+    id,
     condition: condition || null,
     disabled: disabled || false,
     hidden: hidden || false,
-    astLocation: astLocation || { offset: location },
+    loading: false,
+    astLocation: astLocation || defaultASTLocation,
     generatedLocation: generatedLocation || location,
-    location
+    location,
+    text,
+    originalText
   };
 
   return properties;
+}
+
+export function createXHRBreakpoint(
+  path: string,
+  method: string,
+  overrides?: Object = {}
+) {
+  const properties = {
+    path,
+    method,
+    disabled: false,
+    loading: false,
+    text: `URL contains "${path}"`
+  };
+
+  return { ...properties, ...overrides };
 }
 
 function createPendingLocation(location: PendingLocation) {

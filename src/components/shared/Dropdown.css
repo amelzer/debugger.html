@@ -1,7 +1,12 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 .dropdown {
   --width: 150px;
   background: var(--theme-body-background);
   border: 1px solid var(--theme-splitter-color);
+  border-radius: 4px;
   box-shadow: 0 4px 4px 0 var(--search-overlays-semitransparent);
   max-height: 300px;
   position: absolute;
@@ -9,7 +14,7 @@
   top: 23px;
   width: var(--width);
   z-index: 1000;
-  overflow: scroll;
+  overflow: auto;
 }
 
 html[dir="rtl"] .dropdown {
@@ -20,15 +25,18 @@ html[dir="rtl"] .dropdown {
   padding: 0px 2px;
   position: relative;
   align-self: center;
+  height: 100%;
 }
 
 .dropdown-button {
-  color: var(--theme-content-color3);
+  color: var(--theme-comment);
   background: none;
   border: none;
   padding: 0;
   font-weight: 100;
   font-size: 14px;
+  height: 100%;
+  width: 24px;
 }
 
 .dropdown li {
@@ -38,10 +46,37 @@ html[dir="rtl"] .dropdown {
   height: 30px;
   text-overflow: ellipsis;
   white-space: nowrap;
+  display: block;
 }
 
 .dropdown li:hover {
   background-color: var(--search-overlays-semitransparent);
+}
+
+.dropdown-icon {
+  width: var(--icon-size);
+  height: var(--icon-size);
+  margin-right: 5px;
+  vertical-align: middle;
+  display: inline-block;
+}
+
+.dropdown-icon.prettyPrint {
+  mask: url(/images/prettyPrint.svg) no-repeat;
+  mask-size: 100%;
+  background: var(--theme-highlight-blue);
+}
+
+.dropdown-icon.blackBox {
+  mask: url(/images/blackBox.svg) no-repeat;
+  mask-size: 100%;
+  background: var(--theme-highlight-blue);
+}
+
+.dropdown-icon.file {
+  mask: url(/images/file.svg) no-repeat;
+  mask-size: 100%;
+  margin-bottom: 7px;
 }
 
 .dropdown ul {

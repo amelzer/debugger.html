@@ -4,10 +4,14 @@
 "use strict";
 
 const { Task } = require("devtools/shared/task");
-var { LocalizationHelper } = require("devtools/shared/l10n");
+const { LocalizationHelper } = require("devtools/shared/l10n");
+const { gDevTools } = require("devtools/client/framework/devtools");
+const { TargetFactory } = require("devtools/client/framework/target");
+const { Toolbox } = require("devtools/client/framework/toolbox");
+loader.lazyRequireGetter(this, "openContentLink", "devtools/client/shared/link", true);
 
 const DBG_STRINGS_URI = "devtools/client/locales/debugger.properties";
-var L10N = new LocalizationHelper(DBG_STRINGS_URI);
+const L10N = new LocalizationHelper(DBG_STRINGS_URI);
 
 function DebuggerPanel(iframeWindow, toolbox) {
   this.panelWin = iframeWindow;
@@ -17,10 +21,6 @@ function DebuggerPanel(iframeWindow, toolbox) {
 
 DebuggerPanel.prototype = {
   open: async function() {
-    if (!this.toolbox.target.isRemote) {
-      await this.toolbox.target.makeRemote();
-    }
-
     const {
       actions,
       store,
@@ -33,7 +33,8 @@ DebuggerPanel.prototype = {
       sourceMaps: this.toolbox.sourceMapService,
       toolboxActions: {
         // Open a link in a new browser tab.
-        openLink: this.openLink.bind(this)
+        openLink: this.openLink.bind(this),
+        openWorkerToolbox: this.openWorkerToolbox.bind(this)
       }
     });
 
@@ -59,22 +60,15 @@ DebuggerPanel.prototype = {
   },
 
   openLink: function(url) {
-    const parentDoc = this.toolbox.doc;
-    if (!parentDoc) {
-      return;
-    }
+    openContentLink(url);
+  },
 
-    const win = parentDoc.querySelector("window");
-    if (!win) {
-      return;
-    }
-
-    const top = win.ownerDocument.defaultView.top;
-    if (!top || typeof top.openUILinkIn !== "function") {
-      return;
-    }
-
-    top.openUILinkIn(url, "tab");
+  openWorkerToolbox: async function(worker) {
+    const [response, workerTargetFront] =
+      await this.toolbox.target.client.attachWorker(worker.actor);
+    const workerTarget = TargetFactory.forWorker(workerTargetFront);
+    const toolbox = await gDevTools.showToolbox(workerTarget, "jsdebugger", Toolbox.HostType.WINDOW);
+    toolbox.once("destroy", () => workerTargetFront.detach());
   },
 
   getFrames: function() {
@@ -98,8 +92,16 @@ DebuggerPanel.prototype = {
     return { frames, selected };
   },
 
-  selectSource(sourceURL, sourceLine) {
-    this._actions.selectSourceURL(sourceURL, { line: sourceLine });
+  getMappedExpression(expression) {
+    return this._actions.getMappedExpression(expression);
+  },
+
+  isPaused() {
+    return this._selectors.isPaused(this._getState());
+  },
+
+  selectSource(url, line) {
+    this._actions.selectSourceURL(url, { line });
   },
 
   getSource(sourceURL) {

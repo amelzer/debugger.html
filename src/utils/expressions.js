@@ -1,11 +1,15 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
 import { correctIndentation } from "./indentation";
-import type { Expression } from "debugger-html";
+import type { Expression } from "../types";
 
-// replace quotes and slashes that could interfere with the evaluation.
+// replace quotes that could interfere with the evaluation.
 export function sanitizeInput(input: string) {
-  return input.replace(/\\/g, "\\\\").replace(/"/g, '"');
+  return input.replace(/"/g, '"');
 }
 
 /*
@@ -24,6 +28,14 @@ export function wrapExpression(input: string) {
   `);
 }
 
+function isUnavailable(value) {
+  if (!value.preview || !value.preview.name) {
+    return false;
+  }
+
+  return ["ReferenceError", "TypeError"].includes(value.preview.name);
+}
+
 export function getValue(expression: Expression) {
   const value = expression.value;
   if (!value) {
@@ -34,6 +46,9 @@ export function getValue(expression: Expression) {
   }
 
   if (value.exception) {
+    if (isUnavailable(value.exception)) {
+      return { value: { unavailable: true } };
+    }
     return {
       path: value.from,
       value: value.exception
@@ -49,9 +64,11 @@ export function getValue(expression: Expression) {
 
   if (value.result && value.result.class == "Error") {
     const { name, message } = value.result.preview;
-    const newValue =
-      name === "ReferenceError" ? { unavailable: true } : `${name}: ${message}`;
+    if (isUnavailable(value.result)) {
+      return { value: { unavailable: true } };
+    }
 
+    const newValue = `${name}: ${message}`;
     return { path: value.input, value: newValue };
   }
 

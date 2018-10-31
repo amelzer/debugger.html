@@ -1,7 +1,8 @@
-// @flow
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
+// @flow
 
 /**
  * Code coverage reducer
@@ -20,7 +21,7 @@ export type CoverageState = {
   hitCount: Object
 };
 
-export const State = makeRecord(
+export const createCoverageState = makeRecord(
   ({
     coverageOn: false,
     hitCount: I.Map()
@@ -28,7 +29,7 @@ export const State = makeRecord(
 );
 
 function update(
-  state: Record<CoverageState> = State(),
+  state: Record<CoverageState> = createCoverageState(),
   action: Action
 ): Record<CoverageState> {
   switch (action.type) {

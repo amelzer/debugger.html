@@ -1,13 +1,17 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 import React, { Component } from "react";
 import classNames from "classnames";
 import Svg from "../../shared/Svg";
 
-import { formatDisplayName } from "../../../utils/frame";
-import { getFilename } from "../../../utils/source";
+import { formatDisplayName } from "../../../utils/pause/frames";
+import { getFilename, getFileURL } from "../../../utils/source";
 import FrameMenu from "./FrameMenu";
 
-import type { Frame } from "debugger-html";
+import type { Frame } from "../../../types";
 import type { LocalFrame } from "./types";
 
 type FrameTitleProps = {
@@ -15,16 +19,16 @@ type FrameTitleProps = {
   options: Object
 };
 
-function FrameTitle({ frame, options }: FrameTitleProps) {
+function FrameTitle({ frame, options = {} }: FrameTitleProps) {
   const displayName = formatDisplayName(frame, options);
   return <div className="title">{displayName}</div>;
 }
 
-type FrameLocationProps = { frame: LocalFrame };
+type FrameLocationProps = { frame: LocalFrame, displayFullUrl: boolean };
 
-function FrameLocation({ frame }: FrameLocationProps) {
+function FrameLocation({ frame, displayFullUrl = false }: FrameLocationProps) {
   if (!frame.source) {
-    return;
+    return null;
   }
 
   if (frame.library) {
@@ -36,10 +40,12 @@ function FrameLocation({ frame }: FrameLocationProps) {
     );
   }
 
-  const filename = getFilename(frame.source);
-  return (
-    <div className="location">{`${filename}: ${frame.location.line}`}</div>
-  );
+  const { location, source } = frame;
+  const filename = displayFullUrl
+    ? getFileURL(source, false)
+    : getFilename(source);
+
+  return <div className="location">{`${filename}:${location.line}`}</div>;
 }
 
 FrameLocation.displayName = "FrameLocation";
@@ -53,7 +59,9 @@ type FrameComponentProps = {
   frameworkGroupingOn: boolean,
   hideLocation: boolean,
   shouldMapDisplayName: boolean,
-  toggleBlackBox: Function
+  toggleBlackBox: Function,
+  displayFullUrl: boolean,
+  getFrameTitle?: string => string
 };
 
 export default class FrameComponent extends Component<FrameComponentProps> {
@@ -83,7 +91,7 @@ export default class FrameComponent extends Component<FrameComponentProps> {
     frame: Frame,
     selectedFrame: Frame
   ) {
-    if (e.nativeEvent.which == 3 && selectedFrame.id != frame.id) {
+    if (e.which == 3) {
       return;
     }
     this.props.selectFrame(frame);
@@ -94,7 +102,7 @@ export default class FrameComponent extends Component<FrameComponentProps> {
     frame: Frame,
     selectedFrame: Frame
   ) {
-    if (event.key != "Enter" || selectedFrame.id == frame.id) {
+    if (event.key != "Enter") {
       return;
     }
     this.props.selectFrame(frame);
@@ -105,12 +113,21 @@ export default class FrameComponent extends Component<FrameComponentProps> {
       frame,
       selectedFrame,
       hideLocation,
-      shouldMapDisplayName
+      shouldMapDisplayName,
+      displayFullUrl,
+      getFrameTitle
     } = this.props;
 
     const className = classNames("frame", {
       selected: selectedFrame && selectedFrame.id === frame.id
     });
+
+    const title = getFrameTitle
+      ? getFrameTitle(
+          `${getFileURL(frame.source, false)}:${frame.location.line}`
+        )
+      : undefined;
+
     return (
       <li
         key={frame.id}
@@ -119,9 +136,12 @@ export default class FrameComponent extends Component<FrameComponentProps> {
         onKeyUp={e => this.onKeyUp(e, frame, selectedFrame)}
         onContextMenu={e => this.onContextMenu(e)}
         tabIndex={0}
+        title={title}
       >
         <FrameTitle frame={frame} options={{ shouldMapDisplayName }} />
-        {!hideLocation && <FrameLocation frame={frame} />}
+        {!hideLocation && (
+          <FrameLocation frame={frame} displayFullUrl={displayFullUrl} />
+        )}
       </li>
     );
   }

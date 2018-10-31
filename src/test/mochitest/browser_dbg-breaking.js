@@ -5,25 +5,29 @@
 
 add_task(async function() {
   const dbg = await initDebugger("doc-scripts.html");
-  const { selectors: { getSelectedSource }, getState } = dbg;
+  const {
+    selectors: { getSelectedSource },
+    getState
+  } = dbg;
 
   // Make sure we can set a top-level breakpoint and it will be hit on
   // reload.
   await addBreakpoint(dbg, "scripts.html", 18);
   reload(dbg);
+
+  await waitForDispatch(dbg, "NAVIGATE");
+  await waitForSelectedSource(dbg, "doc-scripts.html");
   await waitForPaused(dbg);
-  await waitForLoadedSource(dbg, "doc-scripts.html");
+
   assertPausedLocation(dbg);
   await resume(dbg);
 
-  const paused = waitForPaused(dbg);
-
   // Create an eval script that pauses itself.
   invokeInTab("doEval");
+  await waitForPaused(dbg);
 
-  await paused;
   await resume(dbg);
-  const source = getSelectedSource(getState()).toJS();
+  const source = getSelectedSource(getState())
   ok(!source.url, "It is an eval source");
 
   await addBreakpoint(dbg, source, 5);

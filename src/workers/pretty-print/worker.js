@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
 import prettyFast from "pretty-fast";
@@ -25,8 +29,8 @@ type InvertedMapping = {
   name?: string
 };
 
-function prettyPrint({ url, indent, source }) {
-  const prettified = prettyFast(source, {
+function prettyPrint({ url, indent, sourceText }) {
+  const prettified = prettyFast(sourceText, {
     url: url,
     indent: " ".repeat(indent)
   });

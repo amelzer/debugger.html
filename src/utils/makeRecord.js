@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
 /**
@@ -18,6 +22,7 @@ export type Record<T: Object> = {
   equals<A>(other: A): boolean,
   get<A>(key: $Keys<T>, notSetValue?: any): A,
   getIn<A>(keyPath: Array<any>, notSetValue?: any): A,
+  hasIn<A>(keyPath: Array<any>): boolean,
   set<A>(key: $Keys<T>, value: A): Record<T>,
   setIn(keyPath: Array<any>, ...iterables: Array<any>): Record<T>,
   merge(values: $Shape<T>): Record<T>,

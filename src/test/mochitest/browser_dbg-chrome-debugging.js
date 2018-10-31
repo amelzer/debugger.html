@@ -8,40 +8,30 @@
  */
 
 var gClient, gThreadClient;
-var gNewGlobal = promise.defer();
 var gNewChromeSource = promise.defer();
 
-var { DevToolsLoader } = Cu.import("resource://devtools/shared/Loader.jsm", {});
+var { DevToolsLoader } = ChromeUtils.import(
+  "resource://devtools/shared/Loader.jsm",
+  {}
+);
 var customLoader = new DevToolsLoader();
 customLoader.invisibleToDebugger = true;
 var { DebuggerServer } = customLoader.require("devtools/server/main");
 var { DebuggerClient } = require("devtools/shared/client/debugger-client");
 
 function initDebuggerClient() {
-  if (!DebuggerServer.initialized) {
-    DebuggerServer.init();
-    DebuggerServer.addBrowserActors();
-  }
+  DebuggerServer.init();
+  DebuggerServer.registerAllActors();
   DebuggerServer.allowChromeProcess = true;
 
   let transport = DebuggerServer.connectPipe();
   return new DebuggerClient(transport);
 }
 
-function attachThread(client, actor) {
-  return new Promise(resolve => {
-    client.attachTab(actor, (response, tabClient) => {
-      tabClient.attachThread(null, (r, threadClient) => {
-        resolve(threadClient);
-      });
-    });
-  });
-}
-
-function onNewGlobal() {
-  ok(true, "Received a new chrome global.");
-  gClient.removeListener("newGlobal", onNewGlobal);
-  gNewGlobal.resolve();
+async function attachThread(client, actor) {
+  let [response, targetFront] = await client.attachTarget(actor);
+  let [response2, threadClient] = await targetFront.attachThread(null);
+  return threadClient;
 }
 
 function onNewSource(event, packet) {
@@ -61,7 +51,6 @@ function resumeAndCloseConnection() {
 registerCleanupFunction(function() {
   gClient = null;
   gThreadClient = null;
-  gNewGlobal = null;
   gNewChromeSource = null;
 
   customLoader = null;
@@ -74,15 +63,14 @@ add_task(async function() {
   const [type] = await gClient.connect();
   is(type, "browser", "Root actor should identify itself as a browser.");
 
-  const response = await gClient.getProcess();
+  const response = await gClient.mainRoot.getProcess(0);
   let actor = response.form.actor;
   gThreadClient = await attachThread(gClient, actor);
   gBrowser.selectedTab = BrowserTestUtils.addTab(gBrowser, "about:mozilla");
 
   // listen for a new source and global
   gThreadClient.addListener("newSource", onNewSource);
-  gClient.addListener("newGlobal", onNewGlobal);
-  await promise.all([gNewGlobal.promise, gNewChromeSource.promise]);
+  await gNewChromeSource.promise;
 
   await resumeAndCloseConnection();
 });

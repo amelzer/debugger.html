@@ -1,20 +1,43 @@
-import type { Source } from "debugger-html";
-import { AstPosition } from "./types";
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
+// @flow
+
+import * as t from "@babel/types";
+import type { SimplePath } from "./utils/simple-path";
+import type { Location, SourceId } from "../../types";
+import type { AstPosition } from "./types";
 import { getClosestPath } from "./utils/closest";
 import { isAwaitExpression, isYieldExpression } from "./utils/helpers";
-import type { NodePath } from "babel-traverse";
 
-export function getNextStep(source: Source, pausedPosition: AstPosition) {
-  const currentExpression = getSteppableExpression(source, pausedPosition);
+export function getNextStep(
+  sourceId: SourceId,
+  pausedPosition: AstPosition
+): ?Location {
+  const currentExpression = getSteppableExpression(sourceId, pausedPosition);
   if (!currentExpression) {
     return null;
   }
-  const currentStatement = currentExpression.getStatementParent();
-  return _getNextStep(currentStatement, pausedPosition);
+
+  const currentStatement = currentExpression.find(p => {
+    return p.inList && t.isStatement(p.node);
+  });
+
+  if (!currentStatement) {
+    throw new Error(
+      "Assertion failure - this should always find at least Program"
+    );
+  }
+
+  return _getNextStep(currentStatement, sourceId, pausedPosition);
 }
 
-function getSteppableExpression(source: Source, pausedPosition: AstPosition) {
-  const closestPath = getClosestPath(source, pausedPosition);
+function getSteppableExpression(
+  sourceId: SourceId,
+  pausedPosition: AstPosition
+) {
+  const closestPath = getClosestPath(sourceId, pausedPosition);
 
   if (!closestPath) {
     return null;
@@ -24,15 +47,21 @@ function getSteppableExpression(source: Source, pausedPosition: AstPosition) {
     return closestPath;
   }
 
-  return closestPath.find(p => p.isAwaitExpression() || p.isYieldExpression());
+  return closestPath.find(
+    p => t.isAwaitExpression(p.node) || t.isYieldExpression(p.node)
+  );
 }
 
-function _getNextStep(statement: NodePath, position: AstPosition) {
-  const nextStatement = statement.getSibling(statement.key + 1);
-  if (nextStatement.node) {
+function _getNextStep(
+  statement: SimplePath,
+  sourceId: string,
+  position: AstPosition
+): ?Location {
+  const nextStatement = statement.getSibling(1);
+  if (nextStatement) {
     return {
       ...nextStatement.node.loc.start,
-      sourceId: position.sourceId
+      sourceId: sourceId
     };
   }
 

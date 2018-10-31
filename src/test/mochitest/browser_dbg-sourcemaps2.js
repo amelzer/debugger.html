@@ -1,10 +1,15 @@
 /* Any copyright is dedicated to the Public Domain.
  * http://creativecommons.org/publicdomain/zero/1.0/ */
+requestLongerTimeout(2);
 
 function assertBpInGutter(dbg, lineNumber) {
   const el = findElement(dbg, "breakpoint");
   const bpLineNumber = +el.querySelector(".CodeMirror-linenumber").innerText;
-  is(bpLineNumber, lineNumber);
+  is(
+    bpLineNumber,
+    lineNumber,
+    "Breakpoint is on the correct line in the gutter"
+  );
 }
 
 // Tests loading sourcemapped sources, setting breakpoints, and
@@ -13,10 +18,11 @@ function assertBpInGutter(dbg, lineNumber) {
 // This source map does not have source contents, so it's fetched separately
 add_task(async function() {
   // NOTE: the CORS call makes the test run times inconsistent
-  requestLongerTimeout(2);
-
   const dbg = await initDebugger("doc-sourcemaps2.html");
-  const { selectors: { getBreakpoint, getBreakpoints }, getState } = dbg;
+  const {
+    selectors: { getBreakpoint, getBreakpoints },
+    getState
+  } = dbg;
 
   await waitForSources(dbg, "main.js", "main.min.js");
 
@@ -38,4 +44,13 @@ add_task(async function() {
 
   await waitForPaused(dbg);
   assertPausedLocation(dbg);
+
+  // Tests the existence of the sourcemap link in the original source.
+  ok(findElement(dbg, "sourceMapLink"), "Sourcemap link in original source");
+  await selectSource(dbg, "main.min.js");
+
+  ok(
+    !findElement(dbg, "sourceMapLink"),
+    "No Sourcemap link exists in generated source"
+  );
 });

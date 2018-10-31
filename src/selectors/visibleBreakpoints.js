@@ -1,6 +1,17 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
+// @flow
+
 import { getBreakpoints } from "../reducers/breakpoints";
 import { getSelectedSource } from "../reducers/sources";
 import { isGeneratedId } from "devtools-source-map";
+import { createSelector } from "reselect";
+import memoize from "../utils/memoize";
+
+import type { BreakpointsMap } from "../reducers/types";
+import type { Source } from "../types";
 
 function getLocation(breakpoint, isGeneratedSource) {
   return isGeneratedSource
@@ -8,9 +19,9 @@ function getLocation(breakpoint, isGeneratedSource) {
     : breakpoint.location;
 }
 
-function formatBreakpoint(breakpoint, selectedSource) {
+const formatBreakpoint = memoize(function(breakpoint, selectedSource) {
   const { condition, loading, disabled, hidden } = breakpoint;
-  const sourceId = selectedSource.get("id");
+  const sourceId = selectedSource.id;
   const isGeneratedSource = isGeneratedId(sourceId);
 
   return {
@@ -20,27 +31,29 @@ function formatBreakpoint(breakpoint, selectedSource) {
     disabled,
     hidden
   };
-}
+});
 
 function isVisible(breakpoint, selectedSource) {
-  const sourceId = selectedSource.get("id");
+  const sourceId = selectedSource.id;
   const isGeneratedSource = isGeneratedId(sourceId);
 
   const location = getLocation(breakpoint, isGeneratedSource);
   return location.sourceId === sourceId;
 }
+
 /*
  * Finds the breakpoints, which appear in the selected source.
- *
- * This
- */
-export default function getVisibleBreakpoints(state: OuterState) {
-  const selectedSource = getSelectedSource(state);
-  if (!selectedSource) {
-    return null;
-  }
+  */
+export const getVisibleBreakpoints = createSelector(
+  getSelectedSource,
+  getBreakpoints,
+  (selectedSource: Source, breakpoints: BreakpointsMap) => {
+    if (!selectedSource) {
+      return null;
+    }
 
-  return getBreakpoints(state)
-    .filter(bp => isVisible(bp, selectedSource))
-    .map(bp => formatBreakpoint(bp, selectedSource));
-}
+    return breakpoints
+      .filter(bp => isVisible(bp, selectedSource))
+      .map(bp => formatBreakpoint(bp, selectedSource));
+  }
+);

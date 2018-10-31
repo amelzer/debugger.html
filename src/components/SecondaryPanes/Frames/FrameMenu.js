@@ -1,8 +1,12 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
-import { showMenu } from "devtools-launchpad";
+import { showMenu } from "devtools-contextmenu";
 import { copyToTheClipboard } from "../../../utils/clipboard";
 import type { LocalFrame } from "./types";
-import type { ContextMenuItem } from "debugger-html";
+import type { ContextMenuItem } from "../../../types";
 import { kebabCase } from "lodash";
 
 const blackboxString = "sourceFooter.blackbox";

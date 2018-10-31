@@ -1,7 +1,8 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
-/* global window gThreadClient setNamedTimeout services EVENTS */
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
+/* global window gThreadClient setNamedTimeout EVENTS */
 /* eslint no-shadow: 0  */
 
 /**
@@ -10,7 +11,8 @@
  */
 
 import { reportException } from "../utils/DevToolsUtils";
-import { getPause, getSourceByURL } from "../selectors";
+import { isPaused, getSourceByURL } from "../selectors";
+import { NAME as WAIT_UNTIL } from "./utils/middleware/wait-service";
 
 // delay is in ms
 const FETCH_EVENT_LISTENERS_DELAY = 200;
@@ -21,7 +23,7 @@ let fetchListenersTimerID;
  * @static
  */
 async function asPaused(state: any, client: any, func: any) {
-  if (!getPause(state)) {
+  if (!isPaused(state)) {
     await client.interrupt();
     let result;
 
@@ -59,7 +61,7 @@ export function fetchEventListeners() {
       // on a currently running request
       if (getState().eventListeners.fetchingListeners) {
         dispatch({
-          type: services.WAIT_UNTIL,
+          type: WAIT_UNTIL,
           predicate: action =>
             action.type === "FETCH_EVENT_LISTENERS" && action.status === "done",
           run: dispatch => dispatch(fetchEventListeners())
@@ -88,7 +90,7 @@ function formatListeners(state, listeners) {
     return {
       selector: l.node.selector,
       type: l.type,
-      sourceId: getSourceByURL(state, l.function.location.url).get("id"),
+      sourceId: getSourceByURL(state, l.function.location.url).id,
       line: l.function.location.line
     };
   });

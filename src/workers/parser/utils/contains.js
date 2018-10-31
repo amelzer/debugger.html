@@ -1,7 +1,11 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
 import type { AstLocation, AstPosition } from "../types";
-import type { Node } from "babel-traverse";
+import type { Node } from "@babel/types";
 
 function startsBefore(a: AstLocation, b: AstPosition) {
   let before = a.start.line < b.line;

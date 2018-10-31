@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 .welcomebox {
   width: calc(100% - 1px);
 
@@ -9,7 +13,6 @@
   padding: 50px 0 0 0;
   text-align: center;
   font-size: 1.25em;
-  color: var(--theme-comment-alt);
   background-color: var(--theme-toolbar-background);
   font-weight: lighter;
   z-index: 10;
@@ -20,62 +23,66 @@
   background-color: var(--theme-body-background);
 }
 
-.alignlabel {
-  display: inline-block;
-}
-
-.welcomebox .toggle-button-end {
+.welcomebox .command-bar-button {
   position: absolute;
   top: auto;
-  bottom: 0;
   offset-inline-end: 0;
+  inset-inline-end: 0;
   offset-inline-start: auto;
+  inset-inline-start: auto;
+  bottom: 0;
 }
 
-.welcomebox .small-size-layout {
-  display: none;
-}
-
-.welcomebox .normal-layout {
-  display: inline-block;
+.alignlabel {
+  display: flex;
+  white-space: nowrap;
 }
 
 .shortcutKeys {
-  text-align: right;
-  float: left;
   font-family: Courier;
+}
+
+.shortcutKey,
+.shortcutLabel {
+  flex: 1;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  cursor: pointer;
+}
+
+.welcomebox__searchSources:hover,
+.welcomebox__searchProject:hover,
+.welcomebox__allShortcuts:hover {
+  color: var(--theme-body-color);
 }
 
 .shortcutKey {
-  display: inline-block;
-  margin-right: 10px;
+  text-align: right;
+  padding-right: 10px;
   font-family: Courier;
 }
 
-.shortcutFunction {
+.shortcutLabel {
   text-align: left;
-  float: left;
-  margin-left: 25px;
+  padding-left: 10px;
+}
+
+.shortcutFunction {
+  margin: 0 auto;
+  color: var(--theme-comment);
+  display: table;
+}
+
+.shortcutFunction p {
+  display: table-row;
+}
+
+.shortcutFunction .shortcutKey,
+.shortcutFunction .shortcutLabel {
+  padding: 10px 5px;
+  display: table-cell;
 }
 
 html .welcomebox .toggle-button-end.collapsed {
   bottom: 1px;
-}
-
-@media (max-width: 430px) {
-  .welcomebox .small-size-layout {
-    display: inline-block;
-  }
-
-  .welcomebox .normal-layout {
-    display: none;
-  }
-
-  .shortcutFunction {
-    margin-left: 0;
-  }
-
-  .shortcutKey {
-    display: block;
-  }
 }

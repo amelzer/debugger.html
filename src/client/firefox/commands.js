@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
 import type {
@@ -8,8 +12,9 @@ import type {
   Location,
   Script,
   Source,
-  SourceId
-} from "debugger-html";
+  SourceId,
+  Worker
+} from "../../types";
 
 import type {
   TabTarget,
@@ -20,9 +25,13 @@ import type {
   BPClients
 } from "./types";
 
-import { makeLocationId } from "../../utils/breakpoint";
+import type { PausePoints } from "../../workers/parser";
+
+import { makePendingLocationId } from "../../utils/breakpoint";
 
 import { createSource, createBreakpointLocation } from "./create";
+
+import Services from "devtools-services";
 
 let bpClients: BPClients;
 let threadClient: ThreadClient;
@@ -45,6 +54,22 @@ function setupCommands(dependencies: Dependencies): { bpClients: BPClients } {
   bpClients = {};
 
   return { bpClients };
+}
+
+function createObjectClient(grip: Grip) {
+  return debuggerClient.createObjectClient(grip);
+}
+
+function releaseActor(actor: String) {
+  if (!actor) {
+    return;
+  }
+
+  return debuggerClient.release(actor);
+}
+
+function sendPacket(packet: Object, callback?: Function = r => r) {
+  return debuggerClient.request(packet).then(callback);
 }
 
 function resume(): Promise<*> {
@@ -71,6 +96,30 @@ function stepOut(): Promise<*> {
   });
 }
 
+function rewind(): Promise<*> {
+  return new Promise(resolve => {
+    threadClient.rewind(resolve);
+  });
+}
+
+function reverseStepIn(): Promise<*> {
+  return new Promise(resolve => {
+    threadClient.reverseStepIn(resolve);
+  });
+}
+
+function reverseStepOver(): Promise<*> {
+  return new Promise(resolve => {
+    threadClient.reverseStepOver(resolve);
+  });
+}
+
+function reverseStepOut(): Promise<*> {
+  return new Promise(resolve => {
+    threadClient.reverseStepOut(resolve);
+  });
+}
+
 function breakOnNext(): Promise<*> {
   return threadClient.breakOnNext();
 }
@@ -81,7 +130,7 @@ function sourceContents(sourceId: SourceId): Source {
 }
 
 function getBreakpointByLocation(location: Location) {
-  const id = makeLocationId(location);
+  const id = makePendingLocationId(location);
   const bpClient = bpClients[id];
 
   if (bpClient) {
@@ -100,6 +149,14 @@ function getBreakpointByLocation(location: Location) {
   return null;
 }
 
+function setXHRBreakpoint(path: string, method: string) {
+  return threadClient.setXHRBreakpoint(path, method);
+}
+
+function removeXHRBreakpoint(path: string, method: string) {
+  return threadClient.removeXHRBreakpoint(path, method);
+}
+
 function setBreakpoint(
   location: Location,
   condition: boolean,
@@ -116,7 +173,7 @@ function setBreakpoint(
     })
     .then(([{ actualLocation }, bpClient]) => {
       actualLocation = createBreakpointLocation(location, actualLocation);
-      const id = makeLocationId(actualLocation);
+      const id = makePendingLocationId(actualLocation);
       bpClients[id] = bpClient;
       bpClient.location.line = actualLocation.line;
       bpClient.location.column = actualLocation.column;
@@ -126,9 +183,11 @@ function setBreakpoint(
     });
 }
 
-function removeBreakpoint(generatedLocation: Location) {
+function removeBreakpoint(
+  generatedLocation: Location
+): Promise<void> | ?BreakpointResult {
   try {
-    const id = makeLocationId(generatedLocation);
+    const id = makePendingLocationId(generatedLocation);
     const bpClient = bpClients[id];
     if (!bpClient) {
       console.warn("No breakpoint to delete on server");
@@ -158,18 +217,27 @@ function setBreakpointCondition(
     });
 }
 
-type EvaluateParam = {
-  frameId?: FrameId
-};
+async function evaluateInFrame(script: Script, frameId: string) {
+  return evaluate(script, { frameId });
+}
 
-function evaluate(script: Script, { frameId }: EvaluateParam) {
+async function evaluateExpressions(scripts: Script[], frameId?: string) {
+  return Promise.all(scripts.map(script => evaluate(script, { frameId })));
+}
+
+type EvaluateParam = { frameId?: FrameId };
+
+function evaluate(
+  script: ?Script,
+  { frameId }: EvaluateParam = {}
+): Promise<mixed> {
   const params = frameId ? { frameActor: frameId } : {};
-  if (!tabTarget || !tabTarget.activeConsole) {
-    return Promise.resolve();
+  if (!tabTarget || !tabTarget.activeConsole || !script) {
+    return Promise.resolve({});
   }
 
   return new Promise(resolve => {
-    tabTarget.activeConsole.evaluateJS(
+    tabTarget.activeConsole.evaluateJSAsync(
       script,
       result => resolve(result),
       params
@@ -177,7 +245,25 @@ function evaluate(script: Script, { frameId }: EvaluateParam) {
   });
 }
 
-function debuggeeCommand(script: Script) {
+function autocomplete(
+  input: string,
+  cursor: number,
+  frameId: string
+): Promise<mixed> {
+  if (!tabTarget || !tabTarget.activeConsole || !input) {
+    return Promise.resolve({});
+  }
+  return new Promise(resolve => {
+    tabTarget.activeConsole.autocomplete(
+      input,
+      cursor,
+      result => resolve(result),
+      frameId
+    );
+  });
+}
+
+function debuggeeCommand(script: Script): ?Promise<void> {
   tabTarget.activeConsole.evaluateJS(script, () => {}, {});
 
   if (!debuggerClient) {
@@ -193,7 +279,7 @@ function debuggeeCommand(script: Script) {
 }
 
 function navigate(url: string): Promise<*> {
-  return tabTarget.activeTab.navigateTo(url);
+  return tabTarget.activeTab.navigateTo({ url });
 }
 
 function reload(): Promise<*> {
@@ -223,11 +309,13 @@ async function getFrameScopes(frame: Frame): Promise<*> {
 
 function pauseOnExceptions(
   shouldPauseOnExceptions: boolean,
-  shouldIgnoreCaughtExceptions: boolean
+  shouldPauseOnCaughtExceptions: boolean
 ): Promise<*> {
   return threadClient.pauseOnExceptions(
     shouldPauseOnExceptions,
-    shouldIgnoreCaughtExceptions
+    // Providing opposite value because server
+    // uses "shouldIgnoreCaughtExceptions"
+    !shouldPauseOnCaughtExceptions
   );
 }
 
@@ -252,6 +340,18 @@ function disablePrettyPrint(sourceId: SourceId): Promise<*> {
   return sourceClient.disablePrettyPrint();
 }
 
+async function setPausePoints(sourceId: SourceId, pausePoints: PausePoints) {
+  return sendPacket({ to: sourceId, type: "setPausePoints", pausePoints });
+}
+
+async function setSkipPausing(shouldSkip: boolean) {
+  return threadClient.request({
+    skip: shouldSkip,
+    to: threadClient.actor,
+    type: "skipBreakpoints"
+  });
+}
+
 function interrupt(): Promise<*> {
   return threadClient.interrupt();
 }
@@ -266,11 +366,72 @@ function pauseGrip(func: Function): ObjectClient {
 
 async function fetchSources() {
   const { sources } = await threadClient.getSources();
+
+  // NOTE: this happens when we fetch sources and then immediately navigate
+  if (!sources) {
+    return;
+  }
+
   return sources.map(source => createSource(source, { supportsWasm }));
 }
 
+/**
+ * Temporary helper to check if the current server will support a call to
+ * listWorkers. On Fennec 60 or older, the call will silently crash and prevent
+ * the client from resuming.
+ * XXX: Remove when FF60 for Android is no longer used or available.
+ *
+ * See https://bugzilla.mozilla.org/show_bug.cgi?id=1443550 for more details.
+ */
+async function checkServerSupportsListWorkers() {
+  const root = await tabTarget.root;
+  // root is not available on all debug targets.
+  if (!root) {
+    return false;
+  }
+
+  const deviceFront = await debuggerClient.mainRoot.getFront("device");
+  const description = await deviceFront.getDescription();
+
+  const isFennec = description.apptype === "mobile/android";
+  if (!isFennec) {
+    // Explicitly return true early to avoid calling Services.vs.compare.
+    // This would force us to extent the Services shim provided by
+    // devtools-modules, used when this code runs in a tab.
+    return true;
+  }
+
+  // We are only interested in Fennec release versions here.
+  // We assume that the server fix for Bug 1443550 will land in FF61.
+  const version = description.platformversion;
+  return Services.vc.compare(version, "61.0") >= 0;
+}
+
+async function fetchWorkers(): Promise<{ workers: Worker[] }> {
+  // Temporary workaround for Bug 1443550
+  // XXX: Remove when FF60 for Android is no longer used or available.
+  const supportsListWorkers = await checkServerSupportsListWorkers();
+
+  // NOTE: The Worker and Browser Content toolboxes do not have a parent
+  // with a listWorkers function
+  // TODO: there is a listWorkers property, but it is not a function on the
+  // parent. Investigate what it is
+  if (
+    !threadClient._parent ||
+    typeof threadClient._parent.listWorkers != "function" ||
+    !supportsListWorkers
+  ) {
+    return Promise.resolve({ workers: [] });
+  }
+
+  return threadClient._parent.listWorkers();
+}
+
 const clientCommands = {
+  autocomplete,
   blackBox,
+  createObjectClient,
+  releaseActor,
   interrupt,
   eventListeners,
   pauseGrip,
@@ -278,13 +439,21 @@ const clientCommands = {
   stepIn,
   stepOut,
   stepOver,
+  rewind,
+  reverseStepIn,
+  reverseStepOut,
+  reverseStepOver,
   breakOnNext,
   sourceContents,
   getBreakpointByLocation,
   setBreakpoint,
+  setXHRBreakpoint,
+  removeXHRBreakpoint,
   removeBreakpoint,
   setBreakpointCondition,
   evaluate,
+  evaluateInFrame,
+  evaluateExpressions,
   debuggeeCommand,
   navigate,
   reload,
@@ -293,7 +462,11 @@ const clientCommands = {
   pauseOnExceptions,
   prettyPrint,
   disablePrettyPrint,
-  fetchSources
+  fetchSources,
+  fetchWorkers,
+  sendPacket,
+  setPausePoints,
+  setSkipPausing
 };
 
 export { setupCommands, clientCommands };

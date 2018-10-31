@@ -1,76 +1,108 @@
-// @flow
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
+// @flow
 import React, { Component } from "react";
 import { connect } from "react-redux";
-import { bindActionCreators } from "redux";
-import { filter } from "fuzzaldrin-plus";
+import fuzzyAldrin from "fuzzaldrin-plus";
+import { basename } from "../utils/path";
 
 import actions from "../actions";
 import {
-  getSources,
+  getRelativeSources,
   getQuickOpenEnabled,
   getQuickOpenQuery,
   getQuickOpenType,
   getSelectedSource,
-  getSymbols
+  getSymbols,
+  getTabs,
+  isSymbolsLoading
 } from "../selectors";
 import { scrollList } from "../utils/result-list";
 import {
   formatSymbols,
-  formatSources,
-  parseLineColumn
+  parseLineColumn,
+  formatShortcutResults,
+  formatSources
 } from "../utils/quick-open";
 import Modal from "./shared/Modal";
 import SearchInput from "./shared/SearchInput";
 import ResultList from "./shared/ResultList";
 
-import type { SelectSourceOptions } from "../actions/sources";
 import type {
-  FormattedSource,
-  FormattedSymbolDeclaration,
-  FormattedSymbolDeclarations
+  FormattedSymbolDeclarations,
+  QuickOpenResult
 } from "../utils/quick-open";
-import type { SourceRecord } from "../reducers/sources";
+
+import type { Location, Source } from "../types";
 import type { QuickOpenType } from "../reducers/quick-open";
+
+import "./QuickOpenModal.css";
 
 type Props = {
   enabled: boolean,
   sources: Array<Object>,
-  selectedSource?: SourceRecord,
+  selectedSource?: Source,
   query: string,
   searchType: QuickOpenType,
   symbols: FormattedSymbolDeclarations,
-  selectSource: (id: string, ?SelectSourceOptions) => void,
+  symbolsLoading: boolean,
+  tabs: string[],
+  shortcutsModalEnabled: boolean,
+  selectSpecificLocation: Location => void,
   setQuickOpenQuery: (query: string) => void,
   highlightLineRange: ({ start: number, end: number }) => void,
-  closeQuickOpen: () => void
+  closeQuickOpen: () => void,
+  toggleShortcutsModal: () => void
 };
 
 type State = {
-  results: ?Array<FormattedSource> | ?Array<FormattedSymbolDeclaration>,
+  results: ?Array<QuickOpenResult>,
   selectedIndex: number
 };
+
+type GotoLocationType = {
+  sourceId?: string,
+  line: number,
+  column?: number
+};
+
+function filter(values, query) {
+  return fuzzyAldrin.filter(values, query, {
+    key: "value",
+    maxResults: 1000
+  });
+}
 
 export class QuickOpenModal extends Component<Props, State> {
   constructor(props: Props) {
     super(props);
-    this.state = {
-      results: null,
-      selectedIndex: 0
-    };
+    this.state = { results: null, selectedIndex: 0 };
   }
 
   componentDidMount() {
-    this.updateResults(this.props.query);
+    const { query, shortcutsModalEnabled, toggleShortcutsModal } = this.props;
+
+    this.updateResults(query);
+
+    if (shortcutsModalEnabled) {
+      toggleShortcutsModal();
+    }
   }
 
-  componentDidUpdate(prevProps: any) {
-    if (this.refs.resultList && this.refs.resultList.refs) {
-      scrollList(this.refs.resultList.refs, this.state.selectedIndex);
-    }
-
+  componentDidUpdate(prevProps: Props) {
     const nowEnabled = !prevProps.enabled && this.props.enabled;
     const queryChanged = prevProps.query !== this.props.query;
+
+    if (this.refs.resultList && this.refs.resultList.refs) {
+      scrollList(
+        this.refs.resultList.refs,
+        this.state.selectedIndex,
+        nowEnabled || !queryChanged
+      );
+    }
+
     if (nowEnabled || queryChanged) {
       this.updateResults(this.props.query);
     }
@@ -80,112 +112,142 @@ export class QuickOpenModal extends Component<Props, State> {
     this.props.closeQuickOpen();
   };
 
+  dropGoto = (query: string) => {
+    return query.split(":")[0];
+  };
+
   searchSources = (query: string) => {
-    if (query == "") {
-      const results = this.props.sources;
-      this.setState({ results });
-      return;
-    }
-
-    const { searchType } = this.props;
-
-    if (searchType === "gotoSource") {
-      const [baseQuery] = query.split(":");
-      const results = filter(this.props.sources, baseQuery, { key: "value" });
-      this.setState({ results });
-    } else {
-      const results = filter(this.props.sources, query, { key: "value" });
-      this.setState({ results });
-    }
+    const { sources } = this.props;
+    const results =
+      query == "" ? sources : filter(sources, this.dropGoto(query));
+    return this.setState({ results });
   };
 
   searchSymbols = (query: string) => {
-    const { symbols: { functions, variables }, searchType } = this.props;
+    const {
+      symbols: { functions, variables }
+    } = this.props;
 
     let results = functions;
-    if (searchType === "variables") {
+    if (this.isVariableQuery()) {
       results = variables;
+    } else {
+      results = results.filter(result => result.title !== "anonymous");
     }
+
     if (query === "@" || query === "#") {
-      this.setState({ results });
-      return;
+      return this.setState({ results });
     }
 
-    results = filter(results, query.slice(1), {
-      key: "value"
-    });
+    this.setState({ results: filter(results, query.slice(1)) });
+  };
 
-    this.setState({ results });
+  searchShortcuts = (query: string) => {
+    const results = formatShortcutResults();
+    if (query == "?") {
+      this.setState({ results });
+    } else {
+      this.setState({ results: filter(results, query.slice(1)) });
+    }
+  };
+
+  showTopSources = () => {
+    const { tabs, sources } = this.props;
+    if (tabs.length > 0) {
+      this.setState({
+        results: sources.filter(source => tabs.includes(source.url))
+      });
+    } else {
+      this.setState({ results: sources.slice(0, 100) });
+    }
   };
 
   updateResults = (query: string) => {
+    if (this.isGotoQuery()) {
+      return;
+    }
+
+    if (query == "" && !this.isShortcutQuery()) {
+      return this.showTopSources();
+    }
+
     if (this.isSymbolSearch()) {
       return this.searchSymbols(query);
     }
+
+    if (this.isShortcutQuery()) {
+      return this.searchShortcuts(query);
+    }
+
     return this.searchSources(query);
+  };
+
+  setModifier = (item: QuickOpenResult) => {
+    if (["@", "#", ":"].includes(item.id)) {
+      this.props.setQuickOpenQuery(item.id);
+    }
   };
 
   selectResultItem = (
     e: SyntheticEvent<HTMLElement>,
-    item: ?FormattedSource | ?FormattedSymbolDeclaration
+    item: ?QuickOpenResult
   ) => {
     if (item == null) {
       return;
     }
-    const { selectSource, selectedSource, query, searchType } = this.props;
-    if (this.isSymbolSearch()) {
-      if (selectedSource == null) {
-        return;
-      }
-      selectSource(selectedSource.get("id"), {
-        location: {
-          ...(item.location != null ? { line: item.location.start.line } : {})
-        }
-      });
-    } else if (searchType === "gotoSource") {
-      const location = parseLineColumn(query);
-      if (location != null) {
-        selectSource(item.id, { location });
-      }
-    } else {
-      selectSource(item.id);
+
+    if (this.isShortcutQuery()) {
+      return this.setModifier(item);
     }
 
-    this.closeModal();
+    if (this.isGotoSourceQuery()) {
+      const location = parseLineColumn(this.props.query);
+      return this.gotoLocation({ ...location, sourceId: item.id });
+    }
+
+    if (this.isSymbolSearch()) {
+      return this.gotoLocation({
+        line:
+          item.location && item.location.start ? item.location.start.line : 0
+      });
+    }
+
+    this.gotoLocation({ sourceId: item.id, line: 0 });
   };
 
-  onSelectResultItem = (item: FormattedSource | FormattedSymbolDeclaration) => {
+  onSelectResultItem = (item: QuickOpenResult) => {
     const {
-      selectSource,
+      selectSpecificLocation,
       selectedSource,
-      highlightLineRange,
-      searchType
+      highlightLineRange
     } = this.props;
     if (!this.isSymbolSearch() || selectedSource == null) {
       return;
     }
 
-    if (searchType === "variables") {
-      selectSource(selectedSource.get("id"), {
-        location: {
-          ...(item.location != null ? { line: item.location.start.line } : {})
-        }
+    if (this.isVariableQuery()) {
+      const line =
+        item.location && item.location.start ? item.location.start.line : 0;
+      return selectSpecificLocation({
+        sourceId: selectedSource.id,
+        line
       });
     }
 
-    if (searchType === "functions") {
-      highlightLineRange({
+    if (this.isFunctionQuery()) {
+      return highlightLineRange({
         ...(item.location != null
           ? { start: item.location.start.line, end: item.location.end.line }
           : {}),
-        sourceId: selectedSource.get("id")
+        sourceId: selectedSource.id
       });
     }
   };
 
-  traverseResults = (direction: number) => {
+  traverseResults = (e: SyntheticKeyboardEvent<HTMLElement>) => {
+    const direction = e.key === "ArrowUp" ? -1 : 1;
     const { selectedIndex, results } = this.state;
-    const resultCount = this.resultCount();
+    const resultCount = this.getResultCount();
     const index = selectedIndex + direction;
     const nextIndex = (index + resultCount) % resultCount;
 
@@ -196,138 +258,204 @@ export class QuickOpenModal extends Component<Props, State> {
     }
   };
 
-  onChange = (e: SyntheticInputEvent<HTMLElement>) => {
+  gotoLocation = (location: ?GotoLocationType) => {
+    const { selectSpecificLocation, selectedSource } = this.props;
+    const selectedSourceId = selectedSource ? selectedSource.id : "";
+    if (location != null) {
+      const sourceId = location.sourceId ? location.sourceId : selectedSourceId;
+      selectSpecificLocation({
+        sourceId,
+        line: location.line,
+        column: location.column
+      });
+      this.closeModal();
+    }
+  };
+
+  onChange = (e: SyntheticInputEvent<HTMLInputElement>) => {
     const { selectedSource, setQuickOpenQuery } = this.props;
     setQuickOpenQuery(e.target.value);
-    const noSource = !selectedSource || !selectedSource.get("text");
-    if (this.isSymbolSearch() && noSource) {
+    const noSource = !selectedSource || !selectedSource.text;
+    if ((this.isSymbolSearch() && noSource) || this.isGotoQuery()) {
       return;
     }
+
     this.updateResults(e.target.value);
   };
 
-  onKeyDown = (e: SyntheticKeyboardEvent<HTMLElement>) => {
-    const {
-      selectSource,
-      selectedSource,
-      enabled,
-      query,
-      searchType
-    } = this.props;
+  onKeyDown = (e: SyntheticKeyboardEvent<HTMLInputElement>) => {
+    const { enabled, query } = this.props;
     const { results, selectedIndex } = this.state;
 
-    if (!enabled || !results) {
+    if (!this.isGotoQuery() && (!enabled || !results)) {
       return;
     }
 
-    const canTraverse = searchType !== "goto";
-    if (e.key === "ArrowUp" && canTraverse) {
-      return this.traverseResults(-1);
-    } else if (e.key === "ArrowDown" && canTraverse) {
-      return this.traverseResults(1);
-    } else if (e.key === "Enter") {
-      if (searchType === "goto") {
-        if (!selectedSource) {
-          return;
-        }
+    if (e.key === "Enter") {
+      if (this.isGotoQuery()) {
         const location = parseLineColumn(query);
-        if (location != null) {
-          selectSource(selectedSource.get("id"), { location });
-        }
-      } else {
-        this.selectResultItem(e, results[selectedIndex]);
+        return this.gotoLocation(location);
       }
+
+      if (results) {
+        return this.selectResultItem(e, results[selectedIndex]);
+      }
+    }
+
+    if (e.key === "Tab") {
       return this.closeModal();
-    } else if (e.key === "Tab") {
-      return this.closeModal();
+    }
+
+    if (["ArrowUp", "ArrowDown"].includes(e.key)) {
+      e.preventDefault();
+      return this.traverseResults(e);
     }
   };
 
-  resultCount = () => (this.state.results ? this.state.results.length : 0);
+  getResultCount = () => {
+    const results = this.state.results;
+    return results && results.length ? results.length : 0;
+  };
 
-  isSymbolSearch = () =>
-    ["functions", "variables"].includes(this.props.searchType);
+  // Query helpers
+  isFunctionQuery = () => this.props.searchType === "functions";
+  isVariableQuery = () => this.props.searchType === "variables";
+  isSymbolSearch = () => this.isFunctionQuery() || this.isVariableQuery();
+  isGotoQuery = () => this.props.searchType === "goto";
+  isGotoSourceQuery = () => this.props.searchType === "gotoSource";
+  isShortcutQuery = () => this.props.searchType === "shortcuts";
+  isSourcesQuery = () => this.props.searchType === "sources";
+  isSourceSearch = () => this.isSourcesQuery() || this.isGotoSourceQuery();
 
-  renderResults() {
-    const { enabled, searchType } = this.props;
-    const { selectedIndex, results } = this.state;
+  /* eslint-disable react/no-danger */
+  renderHighlight(
+    candidateString: string | React$Element<"div">,
+    query: string,
+    name: string
+  ): string | React$Element<"div"> {
+    const options = {
+      wrap: {
+        tagOpen: '<mark class="highlight">',
+        tagClose: "</mark>"
+      }
+    };
+    const html = fuzzyAldrin.wrap(candidateString, query, options);
+    return <div dangerouslySetInnerHTML={{ __html: html }} />;
+  }
 
-    if (!enabled || !results) {
-      return null;
+  highlightMatching = (
+    query: string,
+    results: QuickOpenResult[]
+  ): QuickOpenResult[] => {
+    let newQuery = query;
+    if (newQuery === "") {
+      return results;
     }
+    newQuery = query.replace(/[@:#?]/gi, " ");
 
-    return (
-      <ResultList
-        key="results"
-        items={results}
-        selected={selectedIndex}
-        selectItem={this.selectResultItem}
-        ref="resultList"
-        {...(searchType === "sources" || searchType === "gotoSource"
-          ? { size: "big" }
-          : {})}
-      />
-    );
+    return results.map(result => {
+      if (typeof result.title == "string") {
+        return {
+          ...result,
+          title: this.renderHighlight(result.title, basename(newQuery), "title")
+        };
+      }
+      return result;
+    });
+  };
+
+  shouldShowErrorEmoji() {
+    const { query } = this.props;
+    if (this.isGotoQuery()) {
+      return !/^:\d*$/.test(query);
+    }
+    return !this.getResultCount() && !!query;
   }
 
-  renderInput() {
-    const { query, searchType } = this.props;
-    const summaryMsg = L10N.getFormatStr(
-      "sourceSearch.resultsSummary1",
-      this.resultCount()
-    );
-
-    const showSummary =
-      searchType === "sources" ||
-      searchType === "functions" ||
-      searchType === "variables";
-
-    return (
-      <div key="input" className="input-wrapper">
-        <SearchInput
-          query={query}
-          count={this.resultCount()}
-          placeholder={L10N.getStr("sourceSearch.search")}
-          {...(showSummary === true ? { summaryMsg } : {})}
-          onChange={this.onChange}
-          onKeyDown={this.onKeyDown}
-          handleClose={this.closeModal}
-        />
-      </div>
-    );
+  getSummaryMessage() {
+    let summaryMsg = "";
+    if (this.isGotoQuery()) {
+      summaryMsg = L10N.getStr("shortcuts.gotoLine");
+    } else if (
+      (this.isFunctionQuery() || this.isVariableQuery()) &&
+      this.props.symbolsLoading
+    ) {
+      summaryMsg = L10N.getStr("loadingText");
+    }
+    return summaryMsg;
   }
+
   render() {
-    const { enabled } = this.props;
+    const { enabled, query } = this.props;
+    const { selectedIndex, results } = this.state;
 
     if (!enabled) {
       return null;
     }
+    const newResults = results && results.slice(0, 100);
+    const items = this.highlightMatching(query, newResults || []);
+    const expanded = !!items && items.length > 0;
 
     return (
       <Modal in={enabled} handleClose={this.closeModal}>
-        {this.renderInput()}
-        {this.renderResults()}
+        <SearchInput
+          query={query}
+          hasPrefix={true}
+          count={this.getResultCount()}
+          placeholder={L10N.getStr("sourceSearch.search2")}
+          summaryMsg={this.getSummaryMessage()}
+          showErrorEmoji={this.shouldShowErrorEmoji()}
+          onChange={this.onChange}
+          onKeyDown={this.onKeyDown}
+          handleClose={this.closeModal}
+          expanded={expanded}
+          showClose={false}
+          selectedItemId={
+            expanded && items[selectedIndex] ? items[selectedIndex].id : ""
+          }
+          {...(this.isSourceSearch() ? { size: "big" } : {})}
+        />
+        {newResults && (
+          <ResultList
+            key="results"
+            items={items}
+            selected={selectedIndex}
+            selectItem={this.selectResultItem}
+            ref="resultList"
+            expanded={expanded}
+            {...(this.isSourceSearch() ? { size: "big" } : {})}
+          />
+        )}
       </Modal>
     );
   }
 }
 
+/* istanbul ignore next: ignoring testing of redux connection stuff */
 function mapStateToProps(state) {
   const selectedSource = getSelectedSource(state);
-  let symbols = null;
-  if (selectedSource != null) {
-    symbols = getSymbols(state, selectedSource.toJS());
-  }
+
   return {
     enabled: getQuickOpenEnabled(state),
-    sources: formatSources(getSources(state)),
+    sources: formatSources(getRelativeSources(state), getTabs(state)),
     selectedSource,
-    symbols: formatSymbols(symbols),
+    symbols: formatSymbols(getSymbols(state, selectedSource)),
+    symbolsLoading: isSymbolsLoading(state, selectedSource),
     query: getQuickOpenQuery(state),
-    searchType: getQuickOpenType(state)
+    searchType: getQuickOpenType(state),
+    tabs: getTabs(state)
   };
 }
 
-export default connect(mapStateToProps, dispatch =>
-  bindActionCreators(actions, dispatch)
+/* istanbul ignore next: ignoring testing of redux connection stuff */
+export default connect(
+  mapStateToProps,
+  {
+    shortcutsModalEnabled: actions.shortcutsModalEnabled,
+    selectSpecificLocation: actions.selectSpecificLocation,
+    setQuickOpenQuery: actions.setQuickOpenQuery,
+    highlightLineRange: actions.highlightLineRange,
+    closeQuickOpen: actions.closeQuickOpen,
+    toggleShortcutsModal: actions.toggleShortcutsModal
+  }
 )(QuickOpenModal);

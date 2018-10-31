@@ -5,25 +5,22 @@
  * This if the debugger's layout is correctly modified when the toolbox's
  * host changes.
  */
-
-"use strict";
+requestLongerTimeout(2);
 
 var gDefaultHostType = Services.prefs.getCharPref("devtools.toolbox.host");
 
 add_task(async function() {
   // test is too slow on some platforms due to the number of test cases
-  requestLongerTimeout(2);
-
   const dbg = await initDebugger("doc-iframes.html");
 
   const layouts = [
+    ["vertical", "window:small"],
     ["horizontal", "bottom"],
-    ["vertical", "side"],
-    ["horizontal", "window:big"],
-    ["vertical", "window:small"]
+    ["vertical", "right"],
+    ["horizontal", "window:big"]
   ];
 
-  for (let layout of layouts) {
+  for (const layout of layouts) {
     const [orientation, host] = layout;
     await testLayout(dbg, orientation, host);
   }
@@ -57,10 +54,10 @@ async function switchHost(dbg, hostType) {
 
 function resizeToolboxWindow(dbg, host) {
   const { panel, toolbox } = dbg;
-  let sizeOption = host.split(":")[1];
-  let win = toolbox.win.parent;
+  const sizeOption = host.split(":")[1];
+  const win = toolbox.win.parent;
 
-  let breakpoint = 700;
+  const breakpoint = 800;
   if (sizeOption == "big" && win.outerWidth <= breakpoint) {
     return resizeWindow(dbg, breakpoint + 300);
   } else if (sizeOption == "small" && win.outerWidth >= breakpoint) {
@@ -70,7 +67,7 @@ function resizeToolboxWindow(dbg, host) {
 
 function resizeWindow(dbg, width) {
   const { panel, toolbox } = dbg;
-  let win = toolbox.win.parent;
+  const win = toolbox.win.parent;
   const currentWidth = win.screen.width;
   win.resizeTo(width, window.screen.availHeight);
 }

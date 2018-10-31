@@ -4,70 +4,9 @@
   "favicon": "assets/images/favicon.png",
   "theme": "light",
   "dir": "ltr",
+  "defaultURL": "https://devtools-html.github.io/debugger-examples/",
   "logging": {
-    "client": false,
-    "firefoxProxy": false,
-    "actions": false
-  },
-  "performance": {
-    "actions": false
-  },
-  "workers": {
-    "parserURL": "http://localhost:8000/assets/build/parser-worker.js",
-    "sourceMapURL": "http://localhost:8000/assets/build/source-map-worker.js",
-    "prettyPrintURL":
-      "http://localhost:8000/assets/build/pretty-print-worker.js",
-    "searchURL": "http://localhost:8000/assets/build/search-worker.js"
-  },
-  "features": {
-    "blackbox": {
-      "label": "Black Box",
-      "enabled": true
-    },
-    "previewWatch": {
-      "label": "Add watch expression from preview",
-      "enabled": true
-    },
-    "chromeScopes": {
-      "label": "Chrome Scopes",
-      "enabled": false
-    },
-    "eventListeners": {
-      "label": "Event Listeners",
-      "enabled": false
-    },
-    "codeCoverage": {
-      "label": "Code Coverage",
-      "enabled": false
-    },
-    "codeFolding": {
-      "label": "Code Folding",
-      "enabled": false
-    },
-    "searchNav": {
-      "label": "Search Navigation",
-      "enabled": true
-    },
-    "outline": {
-      "label": "Source Outline",
-      "enabled": true
-    },
-    "collapseFrame": {
-      "label": "Collapse Call Frames",
-      "enabled": true
-    },
-    "columnBreakpoints": {
-      "label": "Column Breakpoints",
-      "enabled": false
-    },
-    "highlightScopeLines": {
-      "label": "Highlight the lines in scope",
-      "enabled": false
-    },
-    "workers": {
-      "label": "Workers",
-      "enabled": false
-    }
+    "firefoxProxy": false
   },
   "chrome": {
     "debug": true,

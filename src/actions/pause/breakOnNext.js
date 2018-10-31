@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
 import type { ThunkArgs } from "../types";
@@ -11,12 +15,8 @@ import type { ThunkArgs } from "../types";
  * @static
  */
 export function breakOnNext() {
-  return ({ dispatch, client }: ThunkArgs) => {
-    client.breakOnNext();
-
-    return dispatch({
-      type: "BREAK_ON_NEXT",
-      value: true
-    });
+  return async ({ dispatch, client }: ThunkArgs) => {
+    await client.breakOnNext();
+    return dispatch({ type: "BREAK_ON_NEXT" });
   };
 }

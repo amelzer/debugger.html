@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 .sources-panel {
   background-color: var(--theme-sidebar-background);
   display: flex;
@@ -12,12 +16,61 @@
   user-select: none;
 }
 
+.sources-clear-root {
+  padding: 4px 3px 4px 3px;
+  width: 100%;
+  text-align: start;
+  white-space: nowrap;
+  color: inherit;
+  display: block;
+  position: absolute;
+  top: 0;
+  left: 0;
+  border-bottom: 1px solid var(--theme-splitter-color);
+}
+
+.sources-clear-root i {
+  margin-right: 5px;
+  position: relative;
+}
+
+.sources-clear-root svg {
+  width: 13px;
+  height: 13px;
+}
+
+.theme-dark .sources-clear-root svg {
+  fill: var(--theme-body-color);
+}
+
+.sources-clear-root .home {
+  opacity: 0.5;
+}
+
+.sources-clear-root .breadcrumb svg {
+  width: 5px;
+  top: 2px;
+  position: absolute;
+  margin-right: 5px;
+}
+
+.sources-clear-root-label {
+  margin-left: 5px;
+}
+
+.sources-pane {
+  display: flex;
+  flex: 1;
+  overflow-x: auto;
+  overflow-y: auto;
+  height: 100%;
+  padding: 4px 0;
+}
+
 .sources-list {
   flex: 1;
   display: flex;
-  overflow-x: hidden;
-  overflow-y: auto;
-  padding-top: 11px;
+  overflow: hidden;
 }
 
 .sources-list .managed-tree {
@@ -28,7 +81,8 @@
 }
 
 .sources-list .managed-tree .tree .node {
-  padding: 0px 0px 0px 3px;
+  padding: 0 10px 0 3px;
+  width: 100%;
 }
 
 .sources-list .tree img.arrow {
@@ -39,12 +93,18 @@
   background-color: white;
 }
 
-.sources-list .tree img.arrow.expanded {
-  transform: rotate(0deg);
+.sources-list .tree .label .suffix {
+  font-style: italic;
+  font-size: 0.9em;
+  color: var(--theme-comment);
 }
 
-.theme-dark .sources-list .tree .node:not(.focused) img.arrow {
-  background: var(--theme-content-color3);
+.sources-list .tree .focused .label .suffix {
+  color: inherit;
+}
+
+.sources-list .tree img.arrow.expanded {
+  transform: rotate(0deg);
 }
 
 .theme-dark .source-list .tree .node.focused {
@@ -78,7 +138,11 @@
 
 .sources-panel .outline {
   display: flex;
-  flex: 1;
+  height: 100%;
+}
+
+.tree-indent {
+  border-inline-start: 0 none;
 }
 
 .source-outline-tabs {
@@ -89,35 +153,34 @@
   -moz-user-select: none;
   user-select: none;
   box-sizing: border-box;
+  height: 29px;
+  margin: 0;
+  padding: 0;
 }
 
 .source-outline-tabs .tab {
+  background-color: var(--theme-toolbar-background);
+  border-bottom: 1px solid transparent;
+  border-color: var(--theme-splitter-color);
+  color: var(--theme-body-color);
+  cursor: default;
+  display: inline-flex;
   flex: 1;
   justify-content: center;
-  border-bottom: 1px solid transparent;
-  border-left: 1px solid transparent;
-  display: inline-flex;
-  position: relative;
-  transition: all 0.25s ease;
-  overflow: hidden;
-  padding: 8px 8px 7px 8px;
   margin-bottom: 0px;
   margin-top: -1px;
-  cursor: default;
+  overflow: hidden;
+  padding: 8px 8px 7px 8px;
+  position: relative;
+  transition: all 0.25s ease;
 }
 
 .source-outline-tabs .tab:first-child {
-  border-left: 0;
+  border-inline-end: 1px solid var(--theme-splitter-color);
 }
 
 .source-outline-tabs .tab:hover {
   background-color: var(--theme-toolbar-background-alt);
-  border-color: var(--theme-splitter-color);
-}
-
-.source-outline-tabs .tab {
-  color: var(--theme-body-color);
-  background-color: var(--theme-toolbar-background);
   border-color: var(--theme-splitter-color);
 }
 
@@ -131,6 +194,11 @@
   fill: var(--theme-body-color);
 }
 
+.source-outline-panel {
+  flex: 1;
+  overflow: auto;
+}
+
 .sources-list .managed-tree .tree .node img.blackBox {
   mask: url(/images/blackBox.svg) no-repeat;
   mask-size: 100%;
@@ -138,16 +206,17 @@
   width: 13px;
   height: 13px;
   display: inline-block;
-  margin-inline-end: 5px;
-  margin-bottom: -2px;
+  margin-inline-end: 6px;
+  margin-inline-start: 1px;
+  margin-top: 2px;
 }
 
-.sources-list .managed-tree .tree .node.focused img.blackBox {
+.sources-list .managed-tree .tree .node.focused img {
   background-color: white;
 }
 
 .theme-dark .sources-list .managed-tree .tree .node:not(.focused) img.blackBox {
-  background-color: var(--theme-content-color3);
+  background-color: var(--theme-comment);
 }
 
 .theme-dark .sources-list .managed-tree .tree .node img.blackBox {
@@ -156,4 +225,38 @@
 
 .theme-dark .sources-list .managed-tree .tree .node.focused img.blackBox {
   background-color: white;
+}
+
+.tree:not(.object-inspector)
+  .tree-node[data-expandable="false"]
+  .tree-indent:last-of-type {
+  margin-inline-end: 4px;
+}
+
+/*
+  Custom root styles
+*/
+.sources-pane.sources-list-custom-root {
+  display: block;
+  position: relative;
+}
+
+.sources-list-custom-root .sources-pane {
+  display: block;
+}
+
+.sources-list-custom-root .sources-list,
+.sources-list-custom-root .no-sources-message {
+  position: absolute;
+  top: 26px;
+  right: 0;
+  bottom: 0;
+  left: 0;
+}
+
+/* Removes start margin when a custom root is used */
+.sources-list-custom-root
+  .tree
+  > .tree-node[data-expandable="false"][aria-level="0"] {
+  padding-inline-start: 4px;
 }

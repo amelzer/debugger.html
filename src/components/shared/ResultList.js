@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 import React, { Component } from "react";
 import classnames from "classnames";
@@ -12,28 +16,36 @@ type Props = {
     item: any,
     index: number
   ) => void,
-  size: string
+  size: string,
+  role: string
 };
 
 export default class ResultList extends Component<Props> {
   displayName: "ResultList";
 
   static defaultProps = {
-    size: "small"
+    size: "small",
+    role: "listbox"
   };
 
   constructor(props: Props) {
     super(props);
-    (this: any).renderListItem = this.renderListItem.bind(this);
   }
 
-  renderListItem(item: any, index: number) {
+  renderListItem = (item: any, index: number) => {
+    if (item.value === "/" && item.title === "") {
+      item.title = "(index)";
+    }
+
     const { selectItem, selected } = this.props;
     const props = {
       onClick: event => selectItem(event, item, index),
       key: `${item.id}${item.value}${index}`,
       ref: String(index),
       title: item.value,
+      "aria-labelledby": `${item.id}-title`,
+      "aria-describedby": `${item.id}-subtitle`,
+      role: "option",
       className: classnames("result-item", {
         selected: index === selected
       })
@@ -41,17 +53,33 @@ export default class ResultList extends Component<Props> {
 
     return (
       <li {...props}>
-        <div className="title">{item.title}</div>
-        <div className="subtitle">{item.subtitle}</div>
+        {item.icon && (
+          <div>
+            <img className={item.icon} />
+          </div>
+        )}
+        <div id={`${item.id}-title`} className="title">
+          {item.title}
+        </div>
+        {item.subtitle != item.title ? (
+          <div id={`${item.id}-subtitle`} className="subtitle">
+            {item.subtitle}
+          </div>
+        ) : null}
       </li>
     );
-  }
+  };
 
   render() {
-    const { size, items } = this.props;
+    const { size, items, role } = this.props;
 
     return (
-      <ul className={classnames("result-list", size)}>
+      <ul
+        className={classnames("result-list", size)}
+        id="result-list"
+        role={role}
+        aria-live="polite"
+      >
         {items.map(this.renderListItem)}
       </ul>
     );

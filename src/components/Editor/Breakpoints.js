@@ -1,30 +1,29 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 import { connect } from "react-redux";
-import { bindActionCreators } from "redux";
 import React, { Component } from "react";
 
 import Breakpoint from "./Breakpoint";
 
-import actions from "../../actions";
-import { getSelectedSource } from "../../selectors";
-import getVisibleBreakpoints from "../../selectors/visibleBreakpoints";
+import { getSelectedSource, getVisibleBreakpoints } from "../../selectors";
 import { makeLocationId } from "../../utils/breakpoint";
 import { isLoaded } from "../../utils/source";
 
-import type { SourceRecord, BreakpointsMap } from "../../reducers/types";
+import type { BreakpointsMap } from "../../reducers/types";
+import type { Source } from "../../types";
 
 type Props = {
-  selectedSource: SourceRecord,
+  selectedSource: Source,
   breakpoints: BreakpointsMap,
   editor: Object
 };
 
 class Breakpoints extends Component<Props> {
   shouldComponentUpdate(nextProps: Props) {
-    if (
-      nextProps.selectedSource &&
-      !isLoaded(nextProps.selectedSource.toJS())
-    ) {
+    if (nextProps.selectedSource && !isLoaded(nextProps.selectedSource)) {
       return false;
     }
 
@@ -34,7 +33,7 @@ class Breakpoints extends Component<Props> {
   render() {
     const { breakpoints, selectedSource, editor } = this.props;
 
-    if (!selectedSource || !breakpoints || selectedSource.get("isBlackBoxed")) {
+    if (!selectedSource || !breakpoints || selectedSource.isBlackBoxed) {
       return null;
     }
 
@@ -55,10 +54,7 @@ class Breakpoints extends Component<Props> {
   }
 }
 
-export default connect(
-  state => ({
-    breakpoints: getVisibleBreakpoints(state),
-    selectedSource: getSelectedSource(state)
-  }),
-  dispatch => bindActionCreators(actions, dispatch)
-)(Breakpoints);
+export default connect(state => ({
+  breakpoints: getVisibleBreakpoints(state),
+  selectedSource: getSelectedSource(state)
+}))(Breakpoints);

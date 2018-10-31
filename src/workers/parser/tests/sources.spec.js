@@ -1,6 +1,10 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 import { hasSource, getSource, setSource, clearSources } from "../sources";
 
-import type { Source } from "debugger-html";
+import type { Source } from "../../../types";
 
 describe("sources", () => {
   it("hasSource", () => {

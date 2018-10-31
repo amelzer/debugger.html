@@ -1,12 +1,13 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 .popover .preview-popup {
   background: var(--theme-body-background);
   width: 350px;
-  min-height: 80px;
   border: 1px solid var(--theme-splitter-color);
   padding: 10px;
   height: auto;
-  min-height: inherit;
-  max-height: 200px;
   overflow: auto;
   box-shadow: 1px 2px 3px var(--popup-shadow-color);
 }
@@ -17,10 +18,15 @@
 
 .popover .preview-popup .header-container {
   width: 100%;
-  line-height: 20px;
+  line-height: 15px;
   display: flex;
-  flex-direction: column;
+  flex-direction: row;
   margin-bottom: 5px;
+}
+
+.popover .preview-popup .logo {
+  width: 20px;
+  margin-right: 5px;
 }
 
 .popover .preview-popup .header-container h3 {
@@ -28,6 +34,8 @@
   margin-bottom: 5px;
   font-weight: normal;
   font-size: 14px;
+  line-height: 20px;
+  margin-left: 4px;
 }
 
 .popover .preview-popup .header .link {
@@ -64,7 +72,7 @@
 }
 
 .theme-dark .popover .preview-popup .arrow svg {
-  fill: var(--theme-content-color3);
+  fill: var(--theme-comment);
 }
 
 .tooltip {
@@ -120,5 +128,5 @@
 
 .add-to-expression-bar .expression-to-save-button {
   font-size: 14px;
-  color: var(--theme-content-color3);
+  color: var(--theme-comment);
 }

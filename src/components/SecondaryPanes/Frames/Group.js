@@ -1,8 +1,15 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 import React, { Component } from "react";
 import classNames from "classnames";
 import Svg from "../../shared/Svg";
-import { formatDisplayName, getLibraryFromUrl } from "../../../utils/frame";
+import {
+  getLibraryFromUrl,
+  formatDisplayName
+} from "../../../utils/pause/frames";
 import FrameMenu from "./FrameMenu";
 
 import "./Group.css";
@@ -10,11 +17,11 @@ import "./Group.css";
 import FrameComponent from "./Frame";
 
 import type { LocalFrame } from "./types";
-import type { Frame } from "debugger-html";
+import Badge from "../../shared/Badge";
 
-type FrameLocationProps = { frame: Frame };
+type FrameLocationProps = { frame: LocalFrame };
 function FrameLocation({ frame }: FrameLocationProps) {
-  const library = getLibraryFromUrl(frame);
+  const library = frame.library || getLibraryFromUrl(frame);
   if (!library) {
     return null;
   }
@@ -36,7 +43,9 @@ type Props = {
   toggleFrameworkGrouping: Function,
   copyStackTrace: Function,
   toggleBlackBox: Function,
-  frameworkGroupingOn: boolean
+  frameworkGroupingOn: boolean,
+  displayFullUrl: boolean,
+  getFrameTitle?: string => string
 };
 
 type State = {
@@ -69,7 +78,7 @@ export default class Group extends Component<Props, State> {
   }
 
   toggleFrames = () => {
-    this.setState({ expanded: !this.state.expanded });
+    this.setState(prevState => ({ expanded: !prevState.expanded }));
   };
 
   renderFrames() {
@@ -80,7 +89,9 @@ export default class Group extends Component<Props, State> {
       toggleFrameworkGrouping,
       frameworkGroupingOn,
       toggleBlackBox,
-      copyStackTrace
+      copyStackTrace,
+      displayFullUrl,
+      getFrameTitle
     } = this.props;
 
     const { expanded } = this.state;
@@ -102,6 +113,8 @@ export default class Group extends Component<Props, State> {
             shouldMapDisplayName={false}
             toggleBlackBox={toggleBlackBox}
             toggleFrameworkGrouping={toggleFrameworkGrouping}
+            displayFullUrl={displayFullUrl}
+            getFrameTitle={getFrameTitle}
           />
         ))}
       </div>
@@ -118,7 +131,10 @@ export default class Group extends Component<Props, State> {
         onClick={this.toggleFrames}
         tabIndex={0}
       >
-        <div className="title">{displayName}</div>
+        <div className="d-flex align-items-center min-width-0">
+          <div className="title">{displayName}</div>
+          <Badge>{this.props.group.length}</Badge>
+        </div>
         <FrameLocation frame={frame} />
       </li>
     );

@@ -1,17 +1,24 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
+// @flow
+
 import React, { Component } from "react";
-import { isEnabled } from "devtools-config";
+
+import { CloseButton } from "./Button";
+
 import Svg from "./Svg";
 import classnames from "classnames";
-import CloseButton from "./Button/Close";
 import "./SearchInput.css";
 
 const arrowBtn = (onClick, type, className, tooltip) => {
   const props = {
-    onClick,
-    type,
     className,
+    key: type,
+    onClick,
     title: tooltip,
-    key: type
+    type
   };
 
   return (
@@ -21,61 +28,83 @@ const arrowBtn = (onClick, type, className, tooltip) => {
   );
 };
 
-class SearchInput extends Component {
+type Props = {
+  count: number,
+  expanded: boolean,
+  handleClose?: (e: SyntheticMouseEvent<HTMLDivElement>) => void,
+  handleNext?: (e: SyntheticMouseEvent<HTMLButtonElement>) => void,
+  handlePrev?: (e: SyntheticMouseEvent<HTMLButtonElement>) => void,
+  hasPrefix?: boolean,
+  onBlur?: (e: SyntheticFocusEvent<HTMLInputElement>) => void,
+  onChange: (e: SyntheticInputEvent<HTMLInputElement>) => void,
+  onFocus?: (e: SyntheticFocusEvent<HTMLInputElement>) => void,
+  onKeyDown: (e: SyntheticKeyboardEvent<HTMLInputElement>) => void,
+  onKeyUp?: (e: SyntheticKeyboardEvent<HTMLInputElement>) => void,
+  onHistoryScroll?: (historyValue: string) => void,
+  placeholder: string,
+  query: string,
+  selectedItemId?: string,
+  shouldFocus?: boolean,
+  showErrorEmoji: boolean,
+  size: string,
+  summaryMsg: string,
+  showClose: boolean
+};
+
+type State = {
+  inputFocused: boolean,
+  history: Array<string>
+};
+
+class SearchInput extends Component<Props, State> {
   displayName: "SearchInput";
-  props: {
-    query: string,
-    count: number,
-    placeholder: string,
-    summaryMsg: string,
-    onChange: () => void,
-    handleClose: () => void,
-    showErrorEmoji: boolean,
-    onKeyUp: () => void,
-    onKeyDown: () => void,
-    onFocus: () => void,
-    onBlur: () => void,
-    size: string,
-    handleNext: () => void,
-    handlePrev: () => void
-  };
+  $input: ?HTMLInputElement;
 
   static defaultProps = {
+    expanded: false,
+    hasPrefix: false,
+    selectedItemId: "",
     size: "",
-    showErrorEmoji: true
+    showClose: true
   };
 
+  constructor(props: Props) {
+    super(props);
+
+    this.state = {
+      inputFocused: false,
+      history: []
+    };
+  }
+
   componentDidMount() {
-    this.$input.focus();
-    if (this.$input.value != "") {
-      this.$input.setSelectionRange(
-        this.$input.value.length + 1,
-        this.$input.value.length + 1
-      );
+    this.setFocus();
+  }
+
+  componentDidUpdate(prevProps: Props) {
+    if (this.props.shouldFocus && !prevProps.shouldFocus) {
+      this.setFocus();
     }
   }
 
-  componentDidUpdate() {
-    this.$input.focus();
-    if (this.$input.value != "") {
-      this.$input.setSelectionRange(
-        this.$input.value.length + 1,
-        this.$input.value.length + 1
-      );
-    }
-  }
+  setFocus() {
+    if (this.$input) {
+      const input = this.$input;
+      input.focus();
 
-  shouldShowErrorEmoji() {
-    const { count, query, showErrorEmoji } = this.props;
-    return count === 0 && query.trim() !== "" && !showErrorEmoji;
+      if (!input.value) {
+        return;
+      }
+
+      // omit prefix @:# from being selected
+      const selectStartPos = this.props.hasPrefix ? 1 : 0;
+      input.setSelectionRange(selectStartPos, input.value.length + 1);
+    }
   }
 
   renderSvg() {
-    if (this.shouldShowErrorEmoji()) {
-      return <Svg name="sad-face" />;
-    }
-
-    return <Svg name="magnifying-glass" />;
+    const svgName = this.props.showErrorEmoji ? "sad-face" : "magnifying-glass";
+    return <Svg name={svgName} />;
   }
 
   renderArrowButtons() {
@@ -83,25 +112,94 @@ class SearchInput extends Component {
 
     return [
       arrowBtn(
-        handleNext,
-        "arrow-down",
-        classnames("nav-btn", "next"),
-        L10N.getFormatStr("editor.searchResults.nextResult")
-      ),
-      arrowBtn(
         handlePrev,
         "arrow-up",
         classnames("nav-btn", "prev"),
         L10N.getFormatStr("editor.searchResults.prevResult")
+      ),
+      arrowBtn(
+        handleNext,
+        "arrow-down",
+        classnames("nav-btn", "next"),
+        L10N.getFormatStr("editor.searchResults.nextResult")
       )
     ];
   }
 
-  renderNav() {
-    if (!isEnabled("searchNav")) {
+  onFocus = (e: SyntheticFocusEvent<HTMLInputElement>) => {
+    const { onFocus } = this.props;
+
+    this.setState({ inputFocused: true });
+    if (onFocus) {
+      onFocus(e);
+    }
+  };
+
+  onBlur = (e: SyntheticFocusEvent<HTMLInputElement>) => {
+    const { onBlur } = this.props;
+
+    this.setState({ inputFocused: false });
+    if (onBlur) {
+      onBlur(e);
+    }
+  };
+
+  onKeyDown = (e: any) => {
+    const { onHistoryScroll, onKeyDown } = this.props;
+    if (!onHistoryScroll) {
+      return onKeyDown(e);
+    }
+
+    const inputValue = e.target.value;
+    const { history } = this.state;
+    const currentHistoryIndex = history.indexOf(inputValue);
+
+    if (e.key === "Enter") {
+      this.saveEnteredTerm(inputValue);
+      return onKeyDown(e);
+    }
+
+    if (e.key === "ArrowUp") {
+      const previous =
+        currentHistoryIndex > -1 ? currentHistoryIndex - 1 : history.length - 1;
+      const previousInHistory = history[previous];
+      if (previousInHistory) {
+        e.preventDefault();
+        onHistoryScroll(previousInHistory);
+      }
       return;
     }
 
+    if (e.key === "ArrowDown") {
+      const next = currentHistoryIndex + 1;
+      const nextInHistory = history[next];
+      if (nextInHistory) {
+        onHistoryScroll(nextInHistory);
+      }
+    }
+  };
+
+  saveEnteredTerm(query: string) {
+    const { history } = this.state;
+    const previousIndex = history.indexOf(query);
+    if (previousIndex !== -1) {
+      history.splice(previousIndex, 1);
+    }
+    history.push(query);
+    this.setState({ history });
+  }
+
+  renderSummaryMsg() {
+    const { summaryMsg } = this.props;
+
+    if (!summaryMsg) {
+      return null;
+    }
+
+    return <div className="summary">{summaryMsg}</div>;
+  }
+
+  renderNav() {
     const { count, handleNext, handlePrev } = this.props;
     if ((!handleNext && !handlePrev) || (!count || count == 1)) {
       return;
@@ -114,27 +212,31 @@ class SearchInput extends Component {
 
   render() {
     const {
-      query,
-      placeholder,
-      summaryMsg,
-      onChange,
-      onKeyDown,
-      onKeyUp,
-      onFocus,
-      onBlur,
+      expanded,
       handleClose,
-      size
+      onChange,
+      onKeyUp,
+      placeholder,
+      query,
+      selectedItemId,
+      showErrorEmoji,
+      size,
+      showClose
     } = this.props;
 
     const inputProps = {
       className: classnames({
-        empty: this.shouldShowErrorEmoji()
+        empty: showErrorEmoji
       }),
       onChange,
-      onKeyDown,
+      onKeyDown: e => this.onKeyDown(e),
       onKeyUp,
-      onFocus,
-      onBlur,
+      onFocus: e => this.onFocus(e),
+      onBlur: e => this.onBlur(e),
+      "aria-autocomplete": "list",
+      "aria-controls": "result-list",
+      "aria-activedescendant":
+        expanded && selectedItemId ? `${selectedItemId}-title` : "",
       placeholder,
       value: query,
       spellCheck: false,
@@ -142,12 +244,26 @@ class SearchInput extends Component {
     };
 
     return (
-      <div className={classnames("search-field", size)}>
-        {this.renderSvg()}
-        <input {...inputProps} />
-        <div className="summary">{summaryMsg || ""}</div>
-        {this.renderNav()}
-        <CloseButton handleClick={handleClose} buttonClass={size} />
+      <div
+        className={classnames("search-shadow", {
+          focused: this.state.inputFocused
+        })}
+      >
+        <div
+          className={classnames("search-field", size)}
+          role="combobox"
+          aria-haspopup="listbox"
+          aria-owns="result-list"
+          aria-expanded={expanded}
+        >
+          {this.renderSvg()}
+          <input {...inputProps} />
+          {this.renderSummaryMsg()}
+          {this.renderNav()}
+          {showClose && (
+            <CloseButton handleClick={handleClose} buttonClass={size} />
+          )}
+        </div>
       </div>
     );
   }

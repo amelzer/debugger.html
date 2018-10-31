@@ -1,8 +1,20 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
-import { find, findNext, findPrev, removeOverlay } from "../utils/editor";
+import {
+  clearSearch,
+  find,
+  findNext,
+  findPrev,
+  removeOverlay,
+  searchSourceForHighlight
+} from "../utils/editor";
+import { isWasm, renderWasmText } from "../utils/wasm";
 import { getMatches } from "../workers/search";
-import type { ThunkArgs } from "./types";
+import type { Action, FileTextSearchModifier, ThunkArgs } from "./types";
 
 import {
   getSelectedSource,
@@ -22,7 +34,7 @@ type Match = Object;
 export function doSearch(query: string, editor: Editor) {
   return ({ getState, dispatch }: ThunkArgs) => {
     const selectedSource = getSelectedSource(getState());
-    if (!selectedSource || !selectedSource.get("text")) {
+    if (!selectedSource || !selectedSource.text) {
       return;
     }
 
@@ -31,14 +43,31 @@ export function doSearch(query: string, editor: Editor) {
   };
 }
 
-export function setFileSearchQuery(query: string) {
+export function doSearchForHighlight(
+  query: string,
+  editor: Editor,
+  line: number,
+  ch: number
+) {
+  return async ({ getState, dispatch }: ThunkArgs) => {
+    const selectedSource = getSelectedSource(getState());
+    if (!selectedSource || !selectedSource.text) {
+      return;
+    }
+    dispatch(searchContentsForHighlight(query, editor, line, ch));
+  };
+}
+
+export function setFileSearchQuery(query: string): Action {
   return {
     type: "UPDATE_FILE_SEARCH_QUERY",
     query
   };
 }
 
-export function toggleFileSearchModifier(modifier: string) {
+export function toggleFileSearchModifier(
+  modifier: FileTextSearchModifier
+): Action {
   return { type: "TOGGLE_FILE_SEARCH_MODIFIER", modifier };
 }
 
@@ -46,7 +75,7 @@ export function updateSearchResults(
   characterIndex: number,
   line: number,
   matches: Match[]
-) {
+): Action {
   const matchIndex = matches.findIndex(
     elm => elm.line === line && elm.ch === characterIndex
   );
@@ -67,11 +96,51 @@ export function searchContents(query: string, editor: Object) {
     const modifiers = getFileSearchModifiers(getState());
     const selectedSource = getSelectedSource(getState());
 
+    if (!editor || !selectedSource || !selectedSource.text || !modifiers) {
+      return;
+    }
+
+    const ctx = { ed: editor, cm: editor.codeMirror };
+
+    if (!query) {
+      clearSearch(ctx.cm, query);
+      return;
+    }
+
+    const _modifiers = modifiers.toJS();
+    const sourceId = selectedSource.id;
+    const text = isWasm(sourceId)
+      ? renderWasmText(sourceId, selectedSource.text).join("\n")
+      : selectedSource.text;
+
+    const matches = await getMatches(query, text, _modifiers);
+
+    const res = find(ctx, query, true, _modifiers);
+    if (!res) {
+      return;
+    }
+
+    const { ch, line } = res;
+
+    dispatch(updateSearchResults(ch, line, matches));
+  };
+}
+
+export function searchContentsForHighlight(
+  query: string,
+  editor: Object,
+  line: number,
+  ch: number
+) {
+  return async ({ getState, dispatch }: ThunkArgs) => {
+    const modifiers = getFileSearchModifiers(getState());
+    const selectedSource = getSelectedSource(getState());
+
     if (
       !query ||
       !editor ||
       !selectedSource ||
-      !selectedSource.get("text") ||
+      !selectedSource.text ||
       !modifiers
     ) {
       return;
@@ -79,14 +148,8 @@ export function searchContents(query: string, editor: Object) {
 
     const ctx = { ed: editor, cm: editor.codeMirror };
     const _modifiers = modifiers.toJS();
-    const matches = await getMatches(
-      query,
-      selectedSource.get("text"),
-      _modifiers
-    );
-    const { ch, line } = find(ctx, query, true, _modifiers);
 
-    dispatch(updateSearchResults(ch, line, matches));
+    searchSourceForHighlight(ctx, false, query, true, _modifiers, line, ch);
   };
 }
 
@@ -108,11 +171,14 @@ export function traverseResults(rev: boolean, editor: Editor) {
 
     if (modifiers) {
       const matchedLocations = matches || [];
-      const { ch, line } = rev
+      const results = rev
         ? findPrev(ctx, query, true, modifiers.toJS())
         : findNext(ctx, query, true, modifiers.toJS());
 
-      console.log(line);
+      if (!results) {
+        return;
+      }
+      const { ch, line } = results;
       dispatch(updateSearchResults(ch, line, matchedLocations));
     }
   };
@@ -120,12 +186,10 @@ export function traverseResults(rev: boolean, editor: Editor) {
 
 export function closeFileSearch(editor: Editor) {
   return ({ getState, dispatch }: ThunkArgs) => {
-    const modifiers = getFileSearchModifiers(getState());
-    const query = getFileSearchQuery(getState());
-
-    if (editor && modifiers) {
+    if (editor) {
+      const query = getFileSearchQuery(getState());
       const ctx = { ed: editor, cm: editor.codeMirror };
-      removeOverlay(ctx, query, modifiers.toJS());
+      removeOverlay(ctx, query);
     }
 
     dispatch(setFileSearchQuery(""));

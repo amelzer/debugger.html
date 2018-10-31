@@ -1,7 +1,10 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 import { Component } from "react";
-import { range } from "lodash";
-import { isEmpty } from "lodash";
+import { range, isEmpty } from "lodash";
 import { connect } from "react-redux";
 import { getHighlightedLineRange } from "../../selectors";
 
@@ -15,7 +18,6 @@ class HighlightLines extends Component<Props> {
 
   constructor() {
     super();
-    this.highlightLineRange = this.highlightLineRange.bind(this);
   }
 
   componentDidMount() {
@@ -51,7 +53,7 @@ class HighlightLines extends Component<Props> {
     });
   }
 
-  highlightLineRange() {
+  highlightLineRange = () => {
     const { highlightedLineRange, editor } = this.props;
 
     const { codeMirror } = editor;
@@ -69,7 +71,7 @@ class HighlightLines extends Component<Props> {
         codeMirror.addLineClass(line, "line", "highlight-lines");
       });
     });
-  }
+  };
 
   render() {
     return null;

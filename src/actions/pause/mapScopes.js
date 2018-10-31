@@ -1,42 +1,61 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
-import { getSource, getSelectedFrame } from "../../selectors";
-import { updateScopeBindings } from "../../utils/pause";
-import { isGeneratedId } from "devtools-source-map";
+import { getSource } from "../../selectors";
+import { loadSourceText } from "../sources/loadSourceText";
+import { PROMISE } from "../utils/middleware/promise";
+
+import { features } from "../../utils/prefs";
+import { log } from "../../utils/log";
+import { isGenerated } from "../../utils/source";
+import type { Frame, Scope } from "../../types";
 
 import type { ThunkArgs } from "../types";
 
-export function mapScopes() {
+import { buildMappedScopes } from "../../utils/pause/mapScopes";
+
+export function mapScopes(scopes: Promise<Scope>, frame: Frame) {
   return async function({ dispatch, getState, client, sourceMaps }: ThunkArgs) {
-    const frame = getSelectedFrame(getState());
-    if (!frame) {
-      return;
-    }
-
-    if (isGeneratedId(frame.location.sourceId)) {
-      return;
-    }
-
-    const sourceRecord = getSource(
+    const generatedSource = getSource(
       getState(),
       frame.generatedLocation.sourceId
     );
 
-    if (sourceRecord.get("isWasm")) {
-      return;
-    }
+    const source = getSource(getState(), frame.location.sourceId);
 
-    const frameScopes = await client.getFrameScopes(frame);
-    const scopes = await updateScopeBindings(
-      frameScopes,
-      frame.generatedLocation,
-      sourceMaps
-    );
-
-    dispatch({
+    await dispatch({
       type: "MAP_SCOPES",
       frame,
-      scopes
+      [PROMISE]: (async function() {
+        if (
+          !features.mapScopes ||
+          !source ||
+          !generatedSource ||
+          generatedSource.isWasm ||
+          source.isPrettyPrinted ||
+          isGenerated(source)
+        ) {
+          return null;
+        }
+
+        await dispatch(loadSourceText(source));
+
+        try {
+          return await buildMappedScopes(
+            source,
+            frame,
+            await scopes,
+            sourceMaps,
+            client
+          );
+        } catch (e) {
+          log(e);
+          return null;
+        }
+      })()
     });
   };
 }

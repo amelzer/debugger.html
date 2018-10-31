@@ -1,8 +1,12 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 import { Component } from "react";
 
 import { markText, toEditorRange } from "../../utils/editor";
-require("./CallSite.css");
+import "./CallSite.css";
 
 type MarkerType = {
   clear: Function
@@ -29,7 +33,7 @@ export default class CallSite extends Component<Props> {
   addCallSite = (nextProps: ?Props) => {
     const { editor, callSite, breakpoint, source } = nextProps || this.props;
     const className = !breakpoint ? "call-site" : "call-site-bp";
-    const sourceId = source.get("id");
+    const sourceId = source.id;
     const editorRange = toEditorRange(sourceId, callSite.location);
     this.marker = markText(editor, className, editorRange);
   };

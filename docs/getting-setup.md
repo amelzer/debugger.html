@@ -2,7 +2,7 @@
 
 ![][debugger-intro-gif]
 
-:construction_worker: If something goes wrong, checkout our [most common issues][common-issues] and find us in [slack]!
+:construction_worker: If something goes wrong, checkout our [most common issues][common-issues] and find us in [Slack][slack]!
 
 ### Step 1. Installing the Debugger
 
@@ -17,8 +17,6 @@ git clone https://github.com/devtools-html/debugger.html.git
 cd debugger.html
 yarn install
 ```
-
-*What should I do if I get an error?*
 
 
 
@@ -38,13 +36,15 @@ Open `http://localhost:8000` in any browser and launch
 Firefox or Chrome. You should now be able to select a
 tab to debug.
 
-![][launchpad-screenshot]
+| Launchpad | Tabs |
+| -- | -- |
+| ![pad2-screenshot] | ![launchpad-screenshot] |
 
 Congratulations! You're now up and running. :sweat_smile:
 
 *What should I do if I get an error?*
 
-Ask in our [slack] channel or file an issue [issue][yarn-run-firefox-fails] here.
+Ask in our [Slack][slack] channel or file an [issue][yarn-run-firefox-fails] here.
 
 Here is a list of some of the [most common issues][common-issues]
 
@@ -150,11 +150,10 @@ Note that the [script](https://github.com/devtools-html/devtools-core/blob/maste
 
 It's easy to start Node in a mode where DevTools will find it:
 
-* `--inspect` - tells node to open a debugger server
-* `--debug-brk` - tells node to pause on the first statement
+* `--inspect-brk` - tells node to open a debugger server and pause on the first statement
 
 ```bash
-node --inspect --debug-brk ./node_modules/.bin/webpack
+node --inspect-brk ./node_modules/.bin/webpack
 ```
 
 **Note** *./node_modules/.bin/webpack* could be anything. We're often debugging webpack these days so it's often appropriate :unamused:
@@ -197,3 +196,4 @@ If you want to hack the debugger even with being offline, you might want to get 
 [slack]:https://devtools-html-slack.herokuapp.com/
 [launchpad-screenshot]:https://cloud.githubusercontent.com/assets/2134/22162697/913777b2-df04-11e6-9150-f6ad676c31ef.png
 [nvm]:https://github.com/creationix/nvm
+[pad2-screenshot]: https://shipusercontent.com/1b41eb3d0f4630ed9197c737cb6e3cb4/Screen%20Shot%202017-11-08%20at%2010.08.51%20AM.png

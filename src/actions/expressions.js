@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
 import {
@@ -5,12 +9,16 @@ import {
   getExpressions,
   getSelectedFrame,
   getSelectedFrameId,
-  getSource
+  getSourceFromId,
+  getSelectedSource,
+  getSelectedScopeMappings,
+  getSelectedFrameBindings
 } from "../selectors";
-import { PROMISE } from "../utils/redux/middleware/promise";
-import { replaceOriginalVariableName } from "devtools-map-bindings/src/utils";
-import { isGeneratedId } from "devtools-source-map";
+import { PROMISE } from "./utils/middleware/promise";
 import { wrapExpression } from "../utils/expressions";
+import { features } from "../utils/prefs";
+import { isOriginal } from "../utils/source";
+
 import * as parser from "../workers/parser";
 import type { Expression } from "../types";
 import type { ThunkArgs } from "./types";
@@ -29,31 +37,53 @@ export function addExpression(input: string) {
       return;
     }
 
+    const expressionError = await parser.hasSyntaxError(input);
+
     const expression = getExpression(getState(), input);
     if (expression) {
       return dispatch(evaluateExpression(expression));
     }
 
-    dispatch({
-      type: "ADD_EXPRESSION",
-      input
-    });
+    dispatch({ type: "ADD_EXPRESSION", input, expressionError });
 
     const newExpression = getExpression(getState(), input);
-    dispatch(evaluateExpression(newExpression));
+    if (newExpression) {
+      return dispatch(evaluateExpression(newExpression));
+    }
   };
 }
 
+export function autocomplete(input: string, cursor: number) {
+  return async ({ dispatch, getState, client }: ThunkArgs) => {
+    if (!input) {
+      return;
+    }
+    const frameId = getSelectedFrameId(getState());
+    const result = await client.autocomplete(input, cursor, frameId);
+    await dispatch({ type: "AUTOCOMPLETE", input, result });
+  };
+}
+
+export function clearAutocomplete() {
+  return { type: "CLEAR_AUTOCOMPLETE" };
+}
+
+export function clearExpressionError() {
+  return { type: "CLEAR_EXPRESSION_ERROR" };
+}
+
 export function updateExpression(input: string, expression: Expression) {
-  return ({ dispatch, getState }: ThunkArgs) => {
-    if (!input || input == expression.input) {
+  return async ({ dispatch, getState }: ThunkArgs) => {
+    if (!input) {
       return;
     }
 
+    const expressionError = await parser.hasSyntaxError(input);
     dispatch({
       type: "UPDATE_EXPRESSION",
       expression,
-      input: input
+      input: expressionError ? expression.input : input,
+      expressionError
     });
 
     dispatch(evaluateExpressions());
@@ -85,9 +115,10 @@ export function deleteExpression(expression: Expression) {
 export function evaluateExpressions() {
   return async function({ dispatch, getState, client }: ThunkArgs) {
     const expressions = getExpressions(getState()).toJS();
-    for (const expression of expressions) {
-      await dispatch(evaluateExpression(expression));
-    }
+    const inputs = expressions.map(({ input }) => input);
+    const frameId = getSelectedFrameId(getState());
+    const results = await client.evaluateExpressions(inputs, frameId);
+    dispatch({ type: "EVALUATE_EXPRESSIONS", inputs, results });
   };
 }
 
@@ -99,36 +130,28 @@ function evaluateExpression(expression: Expression) {
     }
 
     let input = expression.input;
-    const error = await parser.hasSyntaxError(input);
-    if (error) {
-      return dispatch({
-        type: "EVALUATE_EXPRESSION",
-        input: expression.input,
-        value: { input: expression.input, result: error }
-      });
-    }
-
     const frame = getSelectedFrame(getState());
 
     if (frame) {
-      const { location, generatedLocation } = frame;
-      const source = getSource(getState(), location.sourceId);
-      const sourceId = source.get("id");
+      const { location } = frame;
+      const source = getSourceFromId(getState(), location.sourceId);
 
-      if (!isGeneratedId(sourceId)) {
-        input = await getMappedExpression(
-          { sourceMaps },
-          generatedLocation,
-          input
-        );
+      const selectedSource = getSelectedSource(getState());
+
+      if (selectedSource && isOriginal(source) && isOriginal(selectedSource)) {
+        const mapResult = await dispatch(getMappedExpression(input));
+        if (mapResult) {
+          input = mapResult.expression;
+        }
       }
     }
 
     const frameId = getSelectedFrameId(getState());
+
     return dispatch({
       type: "EVALUATE_EXPRESSION",
       input: expression.input,
-      [PROMISE]: client.evaluate(wrapExpression(input), { frameId })
+      [PROMISE]: client.evaluateInFrame(wrapExpression(input), frameId)
     });
   };
 }
@@ -137,21 +160,28 @@ function evaluateExpression(expression: Expression) {
  * Gets information about original variable names from the source map
  * and replaces all posible generated names.
  */
-export async function getMappedExpression(
-  { sourceMaps }: Object,
-  generatedLocation: Location,
-  expression: string
-): Promise<string> {
-  const astScopes = await parser.getScopes(generatedLocation);
+export function getMappedExpression(expression: string) {
+  return async function({ dispatch, getState, client, sourceMaps }: ThunkArgs) {
+    const mappings = getSelectedScopeMappings(getState());
+    const bindings = getSelectedFrameBindings(getState());
 
-  const generatedScopes = await sourceMaps.getLocationScopes(
-    generatedLocation,
-    astScopes
-  );
+    // We bail early if we do not need to map the expression. This is important
+    // because mapping an expression can be slow if the parser worker is
+    // busy doing other work.
+    //
+    // 1. there are no mappings - we do not need to map original expressions
+    // 2. does not contain `await` - we do not need to map top level awaits
+    // 3. does not contain `=` - we do not need to map assignments
+    if (!mappings && !expression.match(/(await|=)/)) {
+      return null;
+    }
 
-  if (!generatedScopes) {
-    return expression;
-  }
-
-  return replaceOriginalVariableName(expression, generatedScopes);
+    return parser.mapExpression(
+      expression,
+      mappings,
+      bindings || [],
+      features.mapExpressionBindings,
+      features.mapAwaitExpression
+    );
+  };
 }

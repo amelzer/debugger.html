@@ -1,19 +1,19 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
- * file, You can obtain one at http://mozilla.org/MPL/2.0/. */
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
 /**
  * Event listeners reducer
  * @module reducers/event-listeners
  */
 
-const initialState = {
+const initialEventListenersState = {
   activeEventNames: [],
   listeners: [],
   fetchingListeners: false
 };
 
-function update(state = initialState, action, emit) {
+function update(state = initialEventListenersState, action, emit) {
   switch (action.type) {
     case "UPDATE_EVENT_BREAKPOINTS":
       state.activeEventNames = action.eventNames;
@@ -28,7 +28,7 @@ function update(state = initialState, action, emit) {
       }
       break;
     case "NAVIGATE":
-      return initialState;
+      return initialEventListenersState;
   }
 
   return state;

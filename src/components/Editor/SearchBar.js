@@ -1,9 +1,13 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
 import PropTypes from "prop-types";
 import React, { Component } from "react";
 import { connect } from "react-redux";
-import { bindActionCreators } from "redux";
+import { CloseButton } from "../shared/Button";
 import Svg from "../shared/Svg";
 import actions from "../../actions";
 import {
@@ -21,15 +25,15 @@ import { removeOverlay } from "../../utils/editor";
 import { scrollList } from "../../utils/result-list";
 import classnames from "classnames";
 
-import { SourceEditor } from "devtools-source-editor";
-import type { SourceRecord } from "../../reducers/sources";
+import type { Source } from "../../types";
 import type { ActiveSearchType } from "../../reducers/ui";
 import type { Modifiers, SearchResults } from "../../reducers/file-search";
 
-import type { SelectSourceOptions } from "../../actions/sources";
 import SearchInput from "../shared/SearchInput";
 import { debounce } from "lodash";
 import "./SearchBar.css";
+
+import type SourceEditor from "../../utils/editor/source-editor";
 
 function getShortcuts() {
   const searchAgainKey = L10N.getStr("sourceSearch.search.again.key2");
@@ -47,24 +51,26 @@ type State = {
   query: string,
   selectedResultIndex: number,
   count: number,
-  index: number
+  index: number,
+  inputFocused: boolean
 };
 
 type Props = {
   editor?: SourceEditor,
-  selectSource: (string, ?SelectSourceOptions) => any,
-  selectedSource?: SourceRecord,
-  searchOn?: boolean,
+  selectedSource?: Source,
+  searchOn: boolean,
+  searchResults: SearchResults,
+  modifiers: Modifiers,
+  query: string,
+  toggleFileSearchModifier: string => any,
+  setFileSearchQuery: string => any,
   setActiveSearch: (?ActiveSearchType) => any,
   closeFileSearch: SourceEditor => void,
   doSearch: (string, SourceEditor) => void,
   traverseResults: (boolean, SourceEditor) => void,
-  searchResults: SearchResults,
-  modifiers: Modifiers,
-  toggleFileSearchModifier: string => any,
-  query: string,
-  setFileSearchQuery: string => any,
-  updateSearchResults: ({ count: number, index?: number }) => any
+  updateSearchResults: ({ count: number, index?: number }) => any,
+  showClose?: boolean,
+  size?: string
 };
 
 class SearchBar extends Component<Props, State> {
@@ -74,7 +80,8 @@ class SearchBar extends Component<Props, State> {
       query: props.query,
       selectedResultIndex: 0,
       count: 0,
-      index: -1
+      index: -1,
+      inputFocused: false
     };
   }
 
@@ -124,45 +131,48 @@ class SearchBar extends Component<Props, State> {
   };
 
   clearSearch = () => {
-    const { editor: ed, query, modifiers } = this.props;
-    if (ed && modifiers) {
+    const { editor: ed, query } = this.props;
+    if (ed) {
       const ctx = { ed, cm: ed.codeMirror };
-      removeOverlay(ctx, query, modifiers.toJS());
+      removeOverlay(ctx, query);
     }
   };
 
   closeSearch = (e: SyntheticEvent<HTMLElement>) => {
-    const { editor, searchOn } = this.props;
-
+    const { closeFileSearch, editor, searchOn } = this.props;
     if (editor && searchOn) {
       this.clearSearch();
-      this.props.closeFileSearch(editor);
+      closeFileSearch(editor);
       e.stopPropagation();
       e.preventDefault();
     }
+    this.setState({ query: "", inputFocused: false });
   };
 
   toggleSearch = (e: SyntheticKeyboardEvent<HTMLElement>) => {
     e.stopPropagation();
     e.preventDefault();
-    const { editor } = this.props;
+    const { editor, searchOn, setActiveSearch } = this.props;
 
-    if (!this.props.searchOn) {
-      this.props.setActiveSearch("file");
+    if (!searchOn) {
+      setActiveSearch("file");
     }
 
-    if (this.props.searchOn && editor) {
-      const selection = editor.codeMirror.getSelection();
-      this.setState({ query: selection });
-      if (selection !== "") {
-        this.doSearch(selection);
+    if (searchOn && editor) {
+      const query = editor.codeMirror.getSelection() || this.state.query;
+
+      if (query !== "") {
+        this.setState({ query, inputFocused: true });
+        this.doSearch(query);
+      } else {
+        this.setState({ query: "", inputFocused: true });
       }
     }
   };
 
   doSearch = (query: string) => {
     const { selectedSource } = this.props;
-    if (!selectedSource || !selectedSource.get("text")) {
+    if (!selectedSource || !selectedSource.text) {
       return;
     }
 
@@ -200,18 +210,35 @@ class SearchBar extends Component<Props, State> {
     return this.doSearch(e.target.value);
   };
 
-  onKeyDown = (e: SyntheticKeyboardEvent<HTMLElement>) => {
+  onFocus = (e: SyntheticFocusEvent<HTMLElement>) => {
+    this.setState({ inputFocused: true });
+  };
+
+  onBlur = (e: SyntheticFocusEvent<HTMLElement>) => {
+    this.setState({ inputFocused: false });
+  };
+
+  onKeyDown = (e: any) => {
     if (e.key !== "Enter" && e.key !== "F3") {
       return;
     }
 
     this.traverseResults(e, e.shiftKey);
     e.preventDefault();
+    return this.doSearch(e.target.value);
+  };
+
+  onHistoryScroll = (query: string) => {
+    this.setState({ query });
+    this.doSearch(query);
   };
 
   // Renderers
   buildSummaryMsg() {
-    const { searchResults: { matchIndex, count, index }, query } = this.props;
+    const {
+      searchResults: { matchIndex, count, index },
+      query
+    } = this.props;
 
     if (query.trim() == "") {
       return "";
@@ -229,7 +256,14 @@ class SearchBar extends Component<Props, State> {
   }
 
   renderSearchModifiers = () => {
-    const { modifiers, toggleFileSearchModifier } = this.props;
+    const {
+      modifiers,
+      toggleFileSearchModifier,
+      query,
+      showClose = true,
+      size = "big"
+    } = this.props;
+    const { doSearch } = this;
 
     function SearchModBtn({ modVal, className, svgName, tooltip }) {
       const preppedClass = classnames(className, {
@@ -238,7 +272,16 @@ class SearchBar extends Component<Props, State> {
       return (
         <button
           className={preppedClass}
-          onClick={() => toggleFileSearchModifier(modVal)}
+          onMouseDown={() => {
+            toggleFileSearchModifier(modVal);
+            doSearch(query);
+          }}
+          onKeyDown={(e: any) => {
+            if (e.key === "Enter") {
+              toggleFileSearchModifier(modVal);
+              doSearch(query);
+            }
+          }}
           title={tooltip}
         >
           <Svg name={svgName} />
@@ -269,29 +312,53 @@ class SearchBar extends Component<Props, State> {
           svgName="whole-word-match"
           tooltip={L10N.getStr("symbolSearch.searchModifier.wholeWord")}
         />
+        {showClose && (
+          <React.Fragment>
+            <span className="pipe-divider" />
+            <CloseButton handleClick={this.closeSearch} buttonClass={size} />
+          </React.Fragment>
+        )}
       </div>
     );
   };
 
+  shouldShowErrorEmoji() {
+    const {
+      query,
+      searchResults: { count }
+    } = this.props;
+    return !!query && !count;
+  }
+
   render() {
-    const { searchResults: { count }, searchOn } = this.props;
+    const {
+      searchResults: { count },
+      searchOn
+    } = this.props;
 
     if (!searchOn) {
       return <div />;
     }
-
+    const classes = classnames("search-bar", {
+      "search-bar-focused": this.state.inputFocused
+    });
     return (
-      <div className="search-bar">
+      <div className={classes}>
         <SearchInput
           query={this.state.query}
           count={count}
-          placeholder={L10N.getStr("sourceSearch.search.placeholder")}
+          placeholder={L10N.getStr("sourceSearch.search.placeholder2")}
           summaryMsg={this.buildSummaryMsg()}
           onChange={this.onChange}
+          onFocus={this.onFocus}
+          onBlur={this.onBlur}
+          showErrorEmoji={this.shouldShowErrorEmoji()}
           onKeyDown={this.onKeyDown}
+          onHistoryScroll={this.onHistoryScroll}
           handleNext={e => this.traverseResults(e, false)}
           handlePrev={e => this.traverseResults(e, true)}
-          handleClose={this.closeSearch}
+          shouldFocus={this.state.inputFocused}
+          showClose={false}
         />
         <div className="search-bottom-bar">{this.renderSearchModifiers()}</div>
       </div>
@@ -303,17 +370,25 @@ SearchBar.contextTypes = {
   shortcuts: PropTypes.object
 };
 
+const mapStateToProps = state => ({
+  searchOn: getActiveSearch(state) === "file",
+  selectedSource: getSelectedSource(state),
+  selectedLocation: getSelectedLocation(state),
+  query: getFileSearchQuery(state),
+  modifiers: getFileSearchModifiers(state),
+  highlightedLineRange: getHighlightedLineRange(state),
+  searchResults: getFileSearchResults(state)
+});
+
 export default connect(
-  state => {
-    return {
-      searchOn: getActiveSearch(state) === "file",
-      selectedSource: getSelectedSource(state),
-      selectedLocation: getSelectedLocation(state),
-      query: getFileSearchQuery(state),
-      modifiers: getFileSearchModifiers(state),
-      highlightedLineRange: getHighlightedLineRange(state),
-      searchResults: getFileSearchResults(state)
-    };
-  },
-  dispatch => bindActionCreators(actions, dispatch)
+  mapStateToProps,
+  {
+    toggleFileSearchModifier: actions.toggleFileSearchModifier,
+    setFileSearchQuery: actions.setFileSearchQuery,
+    setActiveSearch: actions.setActiveSearch,
+    closeFileSearch: actions.closeFileSearch,
+    doSearch: actions.doSearch,
+    traverseResults: actions.traverseResults,
+    updateSearchResults: actions.updateSearchResults
+  }
 )(SearchBar);

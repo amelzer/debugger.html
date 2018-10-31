@@ -1,7 +1,12 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 import React, { PureComponent } from "react";
 import { connect } from "react-redux";
-import { bindActionCreators } from "redux";
+import classnames from "classnames";
+import Svg from "../shared/Svg";
 import actions from "../../actions";
 import {
   getSelectedSource,
@@ -9,47 +14,61 @@ import {
   getPaneCollapse
 } from "../../selectors";
 
-import classnames from "classnames";
-import { isEnabled } from "devtools-config";
-import { isPretty, isLoaded } from "../../utils/source";
+import { features } from "../../utils/prefs";
+import {
+  isPretty,
+  isLoaded,
+  getFilename,
+  isOriginal,
+  isLoading
+} from "../../utils/source";
+import { getGeneratedSource } from "../../reducers/sources";
 import { shouldShowFooter, shouldShowPrettyPrint } from "../../utils/editor";
 
-import PaneToggleButton from "../shared/Button/PaneToggle";
+import { PaneToggleButton } from "../shared/Button";
 
-import type { SourceRecord } from "../../reducers/sources";
+import type { Source } from "../../types";
 
 import "./Footer.css";
 
 type Props = {
-  selectedSource: SourceRecord,
-  selectSource: (string, ?Object) => void,
-  editor: any,
+  selectedSource: Source,
+  mappedSource: Source,
+  endPanelCollapsed: boolean,
+  horizontal: boolean,
   togglePrettyPrint: string => void,
   toggleBlackBox: Object => void,
+  jumpToMappedLocation: (Source: any) => void,
   recordCoverage: () => void,
-  togglePaneCollapse: () => void,
-  endPanelCollapsed: boolean,
-  horizontal: boolean
+  togglePaneCollapse: () => void
 };
 
 class SourceFooter extends PureComponent<Props> {
   prettyPrintButton() {
     const { selectedSource, togglePrettyPrint } = this.props;
-    const sourceLoaded = selectedSource && isLoaded(selectedSource.toJS());
+
+    if (isLoading(selectedSource) && selectedSource.isPrettyPrinted) {
+      return (
+        <div className="loader">
+          <Svg name="loader" />
+        </div>
+      );
+    }
 
     if (!shouldShowPrettyPrint(selectedSource)) {
       return;
     }
 
     const tooltip = L10N.getStr("sourceTabs.prettyPrint");
-    const type = "prettyPrint";
+    const sourceLoaded = selectedSource && isLoaded(selectedSource);
 
+    const type = "prettyPrint";
     return (
       <button
-        onClick={() => togglePrettyPrint(selectedSource.get("id"))}
+        onClick={() => togglePrettyPrint(selectedSource.id)}
         className={classnames("action", type, {
           active: sourceLoaded,
-          pretty: isPretty(selectedSource.toJS())
+          pretty: isPretty(selectedSource)
         })}
         key={type}
         title={tooltip}
@@ -62,20 +81,20 @@ class SourceFooter extends PureComponent<Props> {
 
   blackBoxButton() {
     const { selectedSource, toggleBlackBox } = this.props;
-    const sourceLoaded = selectedSource && isLoaded(selectedSource.toJS());
+    const sourceLoaded = selectedSource && isLoaded(selectedSource);
 
-    if (!isEnabled("blackbox") || !sourceLoaded) {
+    if (!sourceLoaded || selectedSource.isPrettyPrinted) {
       return;
     }
 
-    const blackboxed = selectedSource.get("isBlackBoxed");
+    const blackboxed = selectedSource.isBlackBoxed;
 
     const tooltip = L10N.getStr("sourceFooter.blackbox");
     const type = "black-box";
 
     return (
       <button
-        onClick={() => toggleBlackBox(selectedSource.toJS())}
+        onClick={() => toggleBlackBox(selectedSource)}
         className={classnames("action", type, {
           active: sourceLoaded,
           blackboxed: blackboxed
@@ -92,7 +111,7 @@ class SourceFooter extends PureComponent<Props> {
   blackBoxSummary() {
     const { selectedSource } = this.props;
 
-    if (!selectedSource || !selectedSource.get("isBlackBoxed")) {
+    if (!selectedSource || !selectedSource.isBlackBoxed) {
       return;
     }
 
@@ -106,7 +125,7 @@ class SourceFooter extends PureComponent<Props> {
   coverageButton() {
     const { recordCoverage } = this.props;
 
-    if (!isEnabled("codeCoverage")) {
+    if (!features.codeCoverage) {
       return;
     }
 
@@ -148,6 +167,35 @@ class SourceFooter extends PureComponent<Props> {
     );
   }
 
+  renderSourceSummary() {
+    const { mappedSource, jumpToMappedLocation, selectedSource } = this.props;
+
+    if (!mappedSource || !isOriginal(selectedSource)) {
+      return null;
+    }
+
+    const filename = getFilename(mappedSource);
+    const tooltip = L10N.getFormatStr(
+      "sourceFooter.mappedSourceTooltip",
+      filename
+    );
+    const title = L10N.getFormatStr("sourceFooter.mappedSource", filename);
+    const mappedSourceLocation = {
+      sourceId: selectedSource.id,
+      line: 1,
+      column: 1
+    };
+    return (
+      <button
+        className="mapped-source"
+        onClick={() => jumpToMappedLocation(mappedSourceLocation)}
+        title={tooltip}
+      >
+        <span>{title}</span>
+      </button>
+    );
+  }
+
   render() {
     const { selectedSource, horizontal } = this.props;
 
@@ -158,21 +206,32 @@ class SourceFooter extends PureComponent<Props> {
     return (
       <div className="source-footer">
         {this.renderCommands()}
+        {this.renderSourceSummary()}
         {this.renderToggleButton()}
       </div>
     );
   }
 }
 
+const mapStateToProps = state => {
+  const selectedSource = getSelectedSource(state);
+  const selectedId = selectedSource.id;
+
+  return {
+    selectedSource,
+    mappedSource: getGeneratedSource(state, selectedSource),
+    prettySource: getPrettySource(state, selectedId),
+    endPanelCollapsed: getPaneCollapse(state, "end")
+  };
+};
+
 export default connect(
-  state => {
-    const selectedSource = getSelectedSource(state);
-    const selectedId = selectedSource && selectedSource.get("id");
-    return {
-      selectedSource,
-      prettySource: getPrettySource(state, selectedId),
-      endPanelCollapsed: getPaneCollapse(state, "end")
-    };
-  },
-  dispatch => bindActionCreators(actions, dispatch)
+  mapStateToProps,
+  {
+    togglePrettyPrint: actions.togglePrettyPrint,
+    toggleBlackBox: actions.toggleBlackBox,
+    jumpToMappedLocation: actions.jumpToMappedLocation,
+    recordCoverage: actions.recordCoverage,
+    togglePaneCollapse: actions.togglePaneCollapse
+  }
 )(SourceFooter);

@@ -1,3 +1,7 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
 import PropTypes from "prop-types";
@@ -7,12 +11,16 @@ import classnames from "classnames";
 import Transition from "react-transition-group/Transition";
 import "./Modal.css";
 
+type TransitionStatus = "entering" | "exiting" | "entered" | "exited";
+
 type ModalProps = {
-  status: string,
+  status: TransitionStatus,
   children?: ReactNode,
   additionalClass?: string,
   handleClose: () => any
 };
+
+export const transitionTimeout = 175;
 
 export class Modal extends React.Component<ModalProps> {
   onClick = (e: SyntheticEvent<HTMLElement>) => {
@@ -20,15 +28,15 @@ export class Modal extends React.Component<ModalProps> {
   };
 
   render() {
-    const { status } = this.props;
+    const { additionalClass, children, handleClose, status } = this.props;
 
     return (
-      <div className="modal-wrapper" onClick={this.props.handleClose}>
+      <div className="modal-wrapper" onClick={handleClose}>
         <div
-          className={classnames("modal", this.props.additionalClass, status)}
+          className={classnames("modal", additionalClass, status)}
           onClick={this.onClick}
         >
-          {this.props.children}
+          {children}
         </div>
       </div>
     );
@@ -53,8 +61,8 @@ export default function Slide({
   handleClose
 }: SlideProps) {
   return (
-    <Transition in={inProp} timeout={175} appear>
-      {status => (
+    <Transition in={inProp} timeout={transitionTimeout} appear>
+      {(status: TransitionStatus) => (
         <Modal
           status={status}
           additionalClass={additionalClass}

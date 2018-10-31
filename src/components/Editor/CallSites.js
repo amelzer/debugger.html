@@ -1,7 +1,9 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 import React, { Component } from "react";
 import { connect } from "react-redux";
-import { bindActionCreators } from "redux";
-import { features } from "../../utils/prefs";
 
 import { range, keyBy, isEqualWith } from "lodash";
 
@@ -14,7 +16,8 @@ import {
   getBreakpointsForSource
 } from "../../selectors";
 
-import { getTokenLocation, isWasm } from "../../utils/editor";
+import { getTokenLocation } from "../../utils/editor";
+import { isWasm } from "../../utils/wasm";
 
 import actions from "../../actions";
 
@@ -43,8 +46,6 @@ class CallSites extends Component {
 
   constructor(props) {
     super(props);
-    this.onKeyDown = this.onKeyDown.bind(this);
-    this.onKeyUp = this.onKeyUp.bind(this);
 
     this.state = {
       showCallSites: false
@@ -55,37 +56,33 @@ class CallSites extends Component {
     const { editor } = this.props;
     const codeMirrorWrapper = editor.codeMirror.getWrapperElement();
 
-    if (features.columnBreakpoints) {
-      codeMirrorWrapper.addEventListener("click", e => this.onTokenClick(e));
-      document.body.addEventListener("keydown", this.onKeyDown);
-      document.body.addEventListener("keyup", this.onKeyUp);
-    }
+    codeMirrorWrapper.addEventListener("click", e => this.onTokenClick(e));
+    document.body.addEventListener("keydown", this.onKeyDown);
+    document.body.addEventListener("keyup", this.onKeyUp);
   }
 
-  componentDidUnMount() {
+  componentWillUnmount() {
     const { editor } = this.props;
     const codeMirrorWrapper = editor.codeMirror.getWrapperElement();
 
-    if (features.columnBreakpoints) {
-      codeMirrorWrapper.addEventListener("click", e => this.onTokenClick(e));
-      document.body.removeEventListener("keydown", e => this.onKeyDown);
-      document.body.removeEventListener("keyup", this.onKeyUp);
-    }
+    codeMirrorWrapper.removeEventListener("click", e => this.onTokenClick(e));
+    document.body.removeEventListener("keydown", this.onKeyDown);
+    document.body.removeEventListener("keyup", this.onKeyUp);
   }
 
-  onKeyUp(e) {
+  onKeyUp = e => {
     if (e.key === "Alt") {
       e.preventDefault();
       this.setState({ showCallSites: false });
     }
-  }
+  };
 
-  onKeyDown(e) {
+  onKeyDown = e => {
     if (e.key === "Alt") {
       e.preventDefault();
       this.setState({ showCallSites: true });
     }
-  }
+  };
 
   onTokenClick(e) {
     const { target } = e;
@@ -139,7 +136,7 @@ class CallSites extends Component {
     } else {
       addBreakpoint({
         sourceId: sourceId,
-        sourceUrl: selectedSource.get("url"),
+        sourceUrl: selectedSource.url,
         line: line,
         column: column
       });
@@ -192,7 +189,9 @@ function getCallSites(symbols, breakpoints) {
   }
 
   function findBreakpoint(callSite) {
-    const { location: { start, end } } = callSite;
+    const {
+      location: { start, end }
+    } = callSite;
 
     const breakpointId = range(start.column - 1, end.column)
       .map(column => locationKey({ line: start.line, column }))
@@ -208,22 +207,25 @@ function getCallSites(symbols, breakpoints) {
     .map(callSite => ({ ...callSite, breakpoint: findBreakpoint(callSite) }));
 }
 
+const mapStateToProps = state => {
+  const selectedLocation = getSelectedLocation(state);
+  const selectedSource = getSelectedSource(state);
+  const sourceId = selectedLocation && selectedLocation.sourceId;
+  const symbols = getSymbols(state, selectedSource);
+  const breakpoints = getBreakpointsForSource(state, sourceId);
+
+  return {
+    selectedLocation,
+    selectedSource,
+    callSites: getCallSites(symbols, breakpoints),
+    breakpoints: breakpoints
+  };
+};
+
+const { addBreakpoint, removeBreakpoint } = actions;
+const mapDispatchToProps = { addBreakpoint, removeBreakpoint };
+
 export default connect(
-  state => {
-    const selectedLocation = getSelectedLocation(state);
-    const selectedSource = getSelectedSource(state);
-    const sourceId = selectedLocation && selectedLocation.sourceId;
-    const source = selectedSource && selectedSource.toJS();
-
-    const symbols = getSymbols(state, source);
-    const breakpoints = getBreakpointsForSource(state, sourceId);
-
-    return {
-      selectedLocation,
-      selectedSource,
-      callSites: getCallSites(symbols, breakpoints),
-      breakpoints: breakpoints
-    };
-  },
-  dispatch => bindActionCreators(actions, dispatch)
+  mapStateToProps,
+  mapDispatchToProps
 )(CallSites);

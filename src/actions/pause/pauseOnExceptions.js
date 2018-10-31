@@ -1,6 +1,11 @@
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
+
 // @flow
 
-import { PROMISE } from "../../utils/redux/middleware/promise";
+import { PROMISE } from "../utils/middleware/promise";
+import { recordEvent } from "../../utils/telemetry";
 import type { ThunkArgs } from "../types";
 
 /**
@@ -10,16 +15,24 @@ import type { ThunkArgs } from "../types";
  */
 export function pauseOnExceptions(
   shouldPauseOnExceptions: boolean,
-  shouldIgnoreCaughtExceptions: boolean
+  shouldPauseOnCaughtExceptions: boolean
 ) {
   return ({ dispatch, client }: ThunkArgs) => {
-    dispatch({
+    /* eslint-disable camelcase */
+    recordEvent("pause_on_exceptions", {
+      exceptions: shouldPauseOnExceptions,
+      // There's no "n" in the key below (#1463117)
+      caught_exceptio: shouldPauseOnCaughtExceptions
+    });
+    /* eslint-enable camelcase */
+
+    return dispatch({
       type: "PAUSE_ON_EXCEPTIONS",
       shouldPauseOnExceptions,
-      shouldIgnoreCaughtExceptions,
+      shouldPauseOnCaughtExceptions,
       [PROMISE]: client.pauseOnExceptions(
         shouldPauseOnExceptions,
-        shouldIgnoreCaughtExceptions
+        shouldPauseOnCaughtExceptions
       )
     });
   };

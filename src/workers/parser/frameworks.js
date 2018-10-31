@@ -1,13 +1,35 @@
-import getSymbols from "./getSymbols";
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
-export function isReactComponent(source) {
-  const { imports, classes } = getSymbols(source);
+// @flow
 
-  if (!imports || !classes) {
-    return false;
+import * as t from "@babel/types";
+import { getSymbols } from "./getSymbols";
+
+export function getFramework(sourceId: string): ?string {
+  const sourceSymbols = getSymbols(sourceId);
+
+  if (isReactComponent(sourceSymbols)) {
+    return "React";
   }
+  if (isAngularComponent(sourceSymbols)) {
+    return "Angular";
+  }
+  if (isVueComponent(sourceSymbols)) {
+    return "Vue";
+  }
+}
 
-  return importsReact(imports) && extendsComponent(classes);
+// React
+
+function isReactComponent(sourceSymbols) {
+  const { imports, classes, callExpressions } = sourceSymbols;
+  return (
+    importsReact(imports) ||
+    requiresReact(callExpressions) ||
+    extendsReactComponent(classes)
+  );
 }
 
 function importsReact(imports) {
@@ -18,13 +40,38 @@ function importsReact(imports) {
   );
 }
 
-function extendsComponent(classes) {
-  let result = false;
-  classes.some(classObj => {
-    if (classObj.parent.name === "Component") {
-      result = true;
-    }
-  });
-
-  return result;
+function requiresReact(callExpressions) {
+  return callExpressions.some(
+    callExpression =>
+      callExpression.name === "require" &&
+      callExpression.values.some(value => value === "react")
+  );
 }
+
+function extendsReactComponent(classes) {
+  return classes.some(
+    classObj =>
+      t.isIdentifier(classObj.parent, { name: "Component" }) ||
+      t.isIdentifier(classObj.parent, { name: "PureComponent" }) ||
+      (t.isMemberExpression(classObj.parent, { computed: false }) &&
+        t.isIdentifier(classObj.parent, { name: "Component" }))
+  );
+}
+
+// Angular
+
+const isAngularComponent = sourceSymbols => {
+  const { memberExpressions } = sourceSymbols;
+  return memberExpressions.some(
+    item =>
+      item.expression == "angular.controller" ||
+      item.expression == "angular.module"
+  );
+};
+
+// Vue
+
+const isVueComponent = sourceSymbols => {
+  const { identifiers } = sourceSymbols;
+  return identifiers.some(identifier => identifier.name == "Vue");
+};

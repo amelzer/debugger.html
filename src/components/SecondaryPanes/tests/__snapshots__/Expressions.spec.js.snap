@@ -7,19 +7,17 @@ exports[`Expressions should always have unique keys 1`] = `
   <li
     className="expression-container"
     key="expression1"
+    onDoubleClick={[Function]}
+    title="expression1"
   >
     <div
       className="expression-content"
     >
-      <ObjectInspector
+      <Component
         autoExpandDepth={0}
+        createObjectClient={[Function]}
         disableWrap={true}
-        disabledFocus={true}
-        getObjectEntries={[Function]}
-        getObjectProperties={[Function]}
-        loadObjectEntries={[Function]}
-        loadObjectProperties={[Function]}
-        onDoubleClick={[Function]}
+        focusable={false}
         roots={
           Array [
             Object {
@@ -40,6 +38,7 @@ exports[`Expressions should always have unique keys 1`] = `
       >
         <CloseButton
           handleClick={[Function]}
+          tooltip="Remove watch expression"
         />
       </div>
     </div>
@@ -47,19 +46,17 @@ exports[`Expressions should always have unique keys 1`] = `
   <li
     className="expression-container"
     key="expression2"
+    onDoubleClick={[Function]}
+    title="expression2"
   >
     <div
       className="expression-content"
     >
-      <ObjectInspector
+      <Component
         autoExpandDepth={0}
+        createObjectClient={[Function]}
         disableWrap={true}
-        disabledFocus={true}
-        getObjectEntries={[Function]}
-        getObjectProperties={[Function]}
-        loadObjectEntries={[Function]}
-        loadObjectProperties={[Function]}
-        onDoubleClick={[Function]}
+        focusable={false}
         roots={
           Array [
             Object {
@@ -80,6 +77,7 @@ exports[`Expressions should always have unique keys 1`] = `
       >
         <CloseButton
           handleClick={[Function]}
+          tooltip="Remove watch expression"
         />
       </div>
     </div>
@@ -87,13 +85,29 @@ exports[`Expressions should always have unique keys 1`] = `
   <li
     className="expression-input-container"
   >
-    <input
-      className="input-expression"
-      onBlur={[Function]}
-      onKeyPress={[Function]}
-      placeholder="Add watch expression"
-      type="text"
-    />
+    <form
+      className="expression-input-form"
+      onSubmit={[Function]}
+    >
+      <input
+        className="input-expression"
+        onBlur={[Function]}
+        onChange={[Function]}
+        onFocus={[Function]}
+        onKeyDown={[Function]}
+        placeholder="Add watch expression"
+        type="text"
+        value=""
+      />
+      <input
+        style={
+          Object {
+            "display": "none",
+          }
+        }
+        type="submit"
+      />
+    </form>
   </li>
 </ul>
 `;
@@ -105,19 +119,17 @@ exports[`Expressions should render 1`] = `
   <li
     className="expression-container"
     key="expression1"
+    onDoubleClick={[Function]}
+    title="expression1"
   >
     <div
       className="expression-content"
     >
-      <ObjectInspector
+      <Component
         autoExpandDepth={0}
+        createObjectClient={[Function]}
         disableWrap={true}
-        disabledFocus={true}
-        getObjectEntries={[Function]}
-        getObjectProperties={[Function]}
-        loadObjectEntries={[Function]}
-        loadObjectProperties={[Function]}
-        onDoubleClick={[Function]}
+        focusable={false}
         roots={
           Array [
             Object {
@@ -138,6 +150,7 @@ exports[`Expressions should render 1`] = `
       >
         <CloseButton
           handleClick={[Function]}
+          tooltip="Remove watch expression"
         />
       </div>
     </div>
@@ -145,19 +158,17 @@ exports[`Expressions should render 1`] = `
   <li
     className="expression-container"
     key="expression2"
+    onDoubleClick={[Function]}
+    title="expression2"
   >
     <div
       className="expression-content"
     >
-      <ObjectInspector
+      <Component
         autoExpandDepth={0}
+        createObjectClient={[Function]}
         disableWrap={true}
-        disabledFocus={true}
-        getObjectEntries={[Function]}
-        getObjectProperties={[Function]}
-        loadObjectEntries={[Function]}
-        loadObjectProperties={[Function]}
-        onDoubleClick={[Function]}
+        focusable={false}
         roots={
           Array [
             Object {
@@ -178,6 +189,7 @@ exports[`Expressions should render 1`] = `
       >
         <CloseButton
           handleClick={[Function]}
+          tooltip="Remove watch expression"
         />
       </div>
     </div>
@@ -185,13 +197,29 @@ exports[`Expressions should render 1`] = `
   <li
     className="expression-input-container"
   >
-    <input
-      className="input-expression"
-      onBlur={[Function]}
-      onKeyPress={[Function]}
-      placeholder="Add watch expression"
-      type="text"
-    />
+    <form
+      className="expression-input-form"
+      onSubmit={[Function]}
+    >
+      <input
+        className="input-expression"
+        onBlur={[Function]}
+        onChange={[Function]}
+        onFocus={[Function]}
+        onKeyDown={[Function]}
+        placeholder="Add watch expression"
+        type="text"
+        value=""
+      />
+      <input
+        style={
+          Object {
+            "display": "none",
+          }
+        }
+        type="submit"
+      />
+    </form>
   </li>
 </ul>
 `;

@@ -1,12 +1,18 @@
-// @flow
-import React, { Component } from "react";
-import { isEnabled } from "devtools-config";
-import ReactDOM from "react-dom";
+/* This Source Code Form is subject to the terms of the Mozilla Public
+ * License, v. 2.0. If a copy of the MPL was not distributed with this
+ * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
+// @flow
+
+import React, { PureComponent } from "react";
+import ReactDOM from "react-dom";
 import classnames from "classnames";
 import Svg from "../shared/Svg";
 
-import { getDocument, showSourceText, toEditorLine } from "../../utils/editor";
+import { getDocument, toEditorLine } from "../../utils/editor";
+import { features } from "../../utils/prefs";
+
+import type { Source, Breakpoint as BreakpointType } from "../../types";
 
 const breakpointSvg = document.createElement("div");
 ReactDOM.render(<Svg name="breakpoint" />, breakpointSvg);
@@ -15,27 +21,22 @@ function makeMarker(isDisabled: boolean) {
   const bp = breakpointSvg.cloneNode(true);
   bp.className = classnames("editor new-breakpoint", {
     "breakpoint-disabled": isDisabled,
-    "folding-enabled": isEnabled("codeFolding")
+    "folding-enabled": features.codeFolding
   });
 
   return bp;
 }
 
 type Props = {
-  breakpoint: Object,
-  selectedSource: Object,
+  breakpoint: BreakpointType,
+  selectedSource: Source,
   editor: Object
 };
 
-class Breakpoint extends Component<Props> {
+class Breakpoint extends PureComponent<Props> {
   addBreakpoint: Function;
 
-  constructor() {
-    super();
-    this.addBreakpoint = this.addBreakpoint.bind(this);
-  }
-
-  addBreakpoint() {
+  addBreakpoint = () => {
     const { breakpoint, editor, selectedSource } = this.props;
 
     // Hidden Breakpoints are never rendered on the client
@@ -49,10 +50,8 @@ class Breakpoint extends Component<Props> {
       return;
     }
 
-    const sourceId = selectedSource.get("id");
+    const sourceId = selectedSource.id;
     const line = toEditorLine(sourceId, breakpoint.location.line);
-
-    showSourceText(editor, selectedSource.toJS());
 
     editor.codeMirror.setGutterMarker(
       line,
@@ -66,19 +65,7 @@ class Breakpoint extends Component<Props> {
     } else {
       editor.codeMirror.removeLineClass(line, "line", "has-condition");
     }
-  }
-
-  shouldComponentUpdate(nextProps: any) {
-    const { editor, breakpoint, selectedSource } = this.props;
-    return (
-      editor !== nextProps.editor ||
-      breakpoint.disabled !== nextProps.breakpoint.disabled ||
-      breakpoint.hidden !== nextProps.breakpoint.hidden ||
-      breakpoint.condition !== nextProps.breakpoint.condition ||
-      breakpoint.loading !== nextProps.breakpoint.loading ||
-      selectedSource !== nextProps.selectedSource
-    );
-  }
+  };
 
   componentDidMount() {
     this.addBreakpoint();
@@ -99,7 +86,7 @@ class Breakpoint extends Component<Props> {
       return;
     }
 
-    const sourceId = selectedSource.get("id");
+    const sourceId = selectedSource.id;
     const doc = getDocument(sourceId);
     if (!doc) {
       return;
