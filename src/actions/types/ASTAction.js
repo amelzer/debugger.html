@@ -4,55 +4,38 @@
 
 // @flow
 
-import type { SourceMetaDataType } from "../../reducers/ast.js";
-import type {
-  SymbolDeclarations,
-  AstLocation,
-  PausePoints
-} from "../../workers/parser";
-
+import type { SymbolDeclarations, AstLocation } from "../../workers/parser";
 import type { PromiseAction } from "../utils/middleware/promise";
+import type { Context } from "../../types";
+import type { PreviewValue } from "../../reducers/types";
 
 export type ASTAction =
   | PromiseAction<
       {|
         +type: "SET_SYMBOLS",
+        +cx: Context,
         +sourceId: string
       |},
       SymbolDeclarations
     >
   | {|
-      +type: "SET_PAUSE_POINTS",
-      +sourceText: string,
-      +sourceId: string,
-      +pausePoints: PausePoints
-    |}
-  | {|
       +type: "OUT_OF_SCOPE_LOCATIONS",
+      +cx: Context,
       +locations: ?(AstLocation[])
     |}
   | {|
       +type: "IN_SCOPE_LINES",
-      +lines: AstLocation[]
+      +cx: Context,
+      +lines: number[]
     |}
   | PromiseAction<
       {|
-        +type: "SET_PREVIEW"
+        +type: "SET_PREVIEW",
+        +cx: Context
       |},
-      {
-        expression: string,
-        result: any,
-        location: AstLocation,
-        tokenPos: any,
-        cursorPos: any,
-        extra: any
-      }
+      PreviewValue
     >
   | {|
-      +type: "SET_SOURCE_METADATA",
-      +sourceId: string,
-      +sourceMetaData: SourceMetaDataType
-    |}
-  | {|
-      +type: "CLEAR_SELECTION"
+      +type: "CLEAR_SELECTION",
+      +cx: Context
     |};

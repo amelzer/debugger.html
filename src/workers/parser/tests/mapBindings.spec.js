@@ -2,7 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
+// @flow
+
 import mapExpressionBindings from "../mapBindings";
+import { parseConsoleScript } from "../utils/ast";
 import cases from "jest-in-case";
 
 const prettier = require("prettier");
@@ -12,12 +15,20 @@ function format(code) {
 }
 
 function excludedTest({ name, expression, bindings = [] }) {
-  const safeExpression = mapExpressionBindings(expression, bindings);
+  const safeExpression = mapExpressionBindings(
+    expression,
+    parseConsoleScript(expression),
+    bindings
+  );
   expect(format(safeExpression)).toEqual(format(expression));
 }
 
 function includedTest({ name, expression, newExpression, bindings }) {
-  const safeExpression = mapExpressionBindings(expression, bindings);
+  const safeExpression = mapExpressionBindings(
+    expression,
+    parseConsoleScript(expression),
+    bindings
+  );
   expect(format(safeExpression)).toEqual(format(newExpression));
 }
 
@@ -34,6 +45,16 @@ describe("mapExpressionBindings", () => {
       newExpression: "self.a = 2; self.b = 3"
     },
     {
+      name: "declaration with separate assignment",
+      expression: "let a; a = 2;",
+      newExpression: "self.a = void 0; self.a = 2;"
+    },
+    {
+      name: "multiple declarations with no assignment",
+      expression: "let a = 2, b;",
+      newExpression: "self.a = 2; self.b = void 0;"
+    },
+    {
       name: "local bindings become assignments",
       bindings: ["a"],
       expression: "var a = 2;",
@@ -48,6 +69,40 @@ describe("mapExpressionBindings", () => {
       name: "assignments with +=",
       expression: "a += 2;",
       newExpression: "self.a += 2;"
+    },
+    {
+      name: "destructuring (objects)",
+      expression: "const { a } = {}; ",
+      newExpression: "({ a: self.a } = {})"
+    },
+    {
+      name: "destructuring (arrays)",
+      expression: " var [a, ...foo] = [];",
+      newExpression: "([self.a, ...self.foo] = [])"
+    },
+    {
+      name: "destructuring (declarations)",
+      expression: "var {d,e} = {}, {f} = {}; ",
+      newExpression: `({ d: self.d, e: self.e } = {});
+        ({ f: self.f } = {})
+      `
+    },
+    {
+      name: "destructuring & declaration",
+      expression: "const { a } = {}; var b = 3",
+      newExpression: `({ a: self.a } = {});
+        self.b = 3
+      `
+    },
+    {
+      name: "destructuring assignment",
+      expression: "[a] = [3]",
+      newExpression: "[self.a] = [3]"
+    },
+    {
+      name: "destructuring assignment (declarations)",
+      expression: "[a] = [3]; var b = 4",
+      newExpression: "[self.a] = [3];\n self.b = 4"
     }
   ]);
 
@@ -83,32 +138,8 @@ describe("mapExpressionBindings", () => {
       expression: "{ var g = 5; }"
     },
     {
-      name: "destructuring assignment",
-      expression: "[a] = [3]"
-    },
-    {
-      name: "destructuring assignment (declarations)",
-      expression: "[a] = [3]; var b = 4"
-    },
-    {
       name: "for loops bindings",
       expression: "for (let foo = 4; false;){}"
-    },
-    {
-      name: "destructuring (objects)",
-      expression: "const { a } = {}; "
-    },
-    {
-      name: "destructuring (arrays)",
-      expression: " var [a, ...foo] = []; "
-    },
-    {
-      name: "destructuring (declarations)",
-      expression: "var {d,e} = {}, {f} = {}; "
-    },
-    {
-      name: "destructuring & declaration",
-      expression: "const { a } = {}; var b = 3"
     }
   ]);
 

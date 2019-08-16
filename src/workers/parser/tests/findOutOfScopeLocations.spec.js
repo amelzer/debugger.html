@@ -3,10 +3,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
+// @flow
+
 import findOutOfScopeLocations from "../findOutOfScopeLocations";
 
-import { getSource } from "./helpers";
-import { setSource } from "../sources";
+import { populateSource } from "./helpers";
 
 function formatLines(actual) {
   return actual
@@ -19,9 +20,8 @@ function formatLines(actual) {
 
 describe("Parser.findOutOfScopeLocations", () => {
   it("should exclude non-enclosing function blocks", () => {
-    const source = getSource("outOfScope");
-    setSource(source);
-    const actual = findOutOfScopeLocations("outOfScope", {
+    const { source } = populateSource("outOfScope");
+    const actual = findOutOfScopeLocations(source.id, {
       line: 5,
       column: 5
     });
@@ -30,9 +30,8 @@ describe("Parser.findOutOfScopeLocations", () => {
   });
 
   it("should roll up function blocks", () => {
-    const source = getSource("outOfScope");
-    setSource(source);
-    const actual = findOutOfScopeLocations("outOfScope", {
+    const { source } = populateSource("outOfScope");
+    const actual = findOutOfScopeLocations(source.id, {
       line: 24,
       column: 0
     });
@@ -41,9 +40,8 @@ describe("Parser.findOutOfScopeLocations", () => {
   });
 
   it("should exclude function for locations on declaration", () => {
-    const source = getSource("outOfScope");
-    setSource(source);
-    const actual = findOutOfScopeLocations("outOfScope", {
+    const { source } = populateSource("outOfScope");
+    const actual = findOutOfScopeLocations(source.id, {
       line: 3,
       column: 12
     });
@@ -52,9 +50,8 @@ describe("Parser.findOutOfScopeLocations", () => {
   });
 
   it("should treat comments as out of scope", () => {
-    const source = getSource("outOfScopeComment");
-    setSource(source);
-    const actual = findOutOfScopeLocations("outOfScopeComment", {
+    const { source } = populateSource("outOfScopeComment");
+    const actual = findOutOfScopeLocations(source.id, {
       line: 3,
       column: 2
     });
@@ -65,9 +62,8 @@ describe("Parser.findOutOfScopeLocations", () => {
   });
 
   it("should not exclude in-scope inner locations", () => {
-    const source = getSource("outOfScope");
-    setSource(source);
-    const actual = findOutOfScopeLocations("outOfScope", {
+    const { source } = populateSource("outOfScope");
+    const actual = findOutOfScopeLocations(source.id, {
       line: 61,
       column: 0
     });

@@ -9,6 +9,7 @@ const {
   getOriginalURLs,
   hasMappedSource,
   getOriginalLocation,
+  getGeneratedRangesForOriginal,
   clearSourceMaps
 } = require("../source-map");
 
@@ -27,7 +28,7 @@ describe("source maps", () => {
     test("source with a url", async () => {
       const urls = await setupBundleFixture("bundle");
       expect(urls).toEqual([
-        "webpack:///webpack/bootstrap 4ef8c7ec7c1df790781e",
+        "webpack:///webpack/bootstrap%204ef8c7ec7c1df790781e",
         "webpack:///entry.js",
         "webpack:///times2.js",
         "webpack:///output.js",
@@ -48,6 +49,93 @@ describe("source maps", () => {
     test("Non-existing sourceRoot resolution with relative URLs", async () => {
       const urls = await setupBundleFixture("noroot2");
       expect(urls).toEqual(["http://example.com/heart.js"]);
+    });
+  });
+
+  describe("getGeneratedRangesForOriginal", () => {
+    test("the overall generated ranges on the source", async () => {
+      const urls = await setupBundleFixture("intermingled-sources");
+
+      const ranges = await getGeneratedRangesForOriginal(
+        "intermingled-sources.js/originalSource-01",
+        urls[0]
+      );
+
+      expect(ranges).toEqual([
+        {
+          start: {
+            line: 4,
+            column: 69
+          },
+          end: {
+            line: 9,
+            column: Infinity
+          }
+        },
+        {
+          start: {
+            line: 11,
+            column: 0
+          },
+          end: {
+            line: 17,
+            column: 3
+          }
+        },
+        {
+          start: {
+            line: 19,
+            column: 18
+          },
+          end: {
+            line: 19,
+            column: 22
+          }
+        },
+        {
+          start: {
+            line: 26,
+            column: 0
+          },
+          end: {
+            line: 26,
+            column: Infinity
+          }
+        },
+        {
+          start: {
+            line: 28,
+            column: 0
+          },
+          end: {
+            line: 28,
+            column: Infinity
+          }
+        }
+      ]);
+    });
+
+    test("the merged generated ranges on the source", async () => {
+      const urls = await setupBundleFixture("intermingled-sources");
+
+      const ranges = await getGeneratedRangesForOriginal(
+        "intermingled-sources.js/originalSource-01",
+        urls[0],
+        true
+      );
+
+      expect(ranges).toEqual([
+        {
+          start: {
+            line: 4,
+            column: 69
+          },
+          end: {
+            line: 28,
+            column: Infinity
+          }
+        }
+      ]);
     });
   });
 

@@ -54,7 +54,8 @@ function mount(props, { initialState } = {}) {
   const client = {
     createObjectClient: grip =>
       ObjectClient(grip, {
-        getPrototype: () => Promise.resolve(protoStub)
+        getPrototype: () => Promise.resolve(protoStub),
+        getProxySlots: () => Promise.resolve(gripRepStubs.get("testProxySlots"))
       }),
 
     createLongStringClient: grip =>
@@ -70,7 +71,12 @@ function mount(props, { initialState } = {}) {
   return mountObjectInspector({
     client,
     props: generateDefaults(props),
-    initialState: { objectInspector: initialState }
+    initialState: {
+      objectInspector: {
+        ...initialState,
+        evaluations: new Map()
+      }
+    }
   });
 }
 
@@ -261,7 +267,7 @@ describe("ObjectInspector - state", () => {
     getSelection().setMockSelection("test");
 
     const root1 = nodes.at(0);
-    root1.find("img.arrow").simulate("click");
+    root1.find(".arrow").simulate("click");
     expect(getExpandedPaths(store.getState()).has("root-1")).toBeTruthy();
     expect(formatObjectInspector(wrapper)).toMatchSnapshot();
 

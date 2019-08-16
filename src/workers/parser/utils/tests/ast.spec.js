@@ -2,13 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
+// @flow
+
 import { getAst } from "../ast";
 import { setSource } from "../../sources";
 import cases from "jest-in-case";
 
-function createSource(contentType) {
-  return { id: "foo", text: "2", contentType };
-}
+import { makeMockSourceAndContent } from "../../../../utils/test-mockup";
 
 const astKeys = [
   "type",
@@ -23,9 +23,20 @@ const astKeys = [
 cases(
   "ast.getAst",
   ({ name }) => {
-    const source = createSource(name);
-    setSource(source);
-    expect(Object.keys(getAst("foo"))).toEqual(astKeys);
+    const { source, content } = makeMockSourceAndContent(
+      undefined,
+      "foo",
+      name,
+      "2"
+    );
+    setSource({
+      id: source.id,
+      text: content.value || "",
+      contentType: content.contentType,
+      isWasm: false
+    });
+    const ast = getAst("foo");
+    expect(ast && Object.keys(ast)).toEqual(astKeys);
   },
   [
     { name: "text/javascript" },

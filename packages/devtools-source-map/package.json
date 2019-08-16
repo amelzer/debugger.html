@@ -4,10 +4,10 @@
   "description": "DevTools utilities for working with source maps",
   "license": "MPL-2.0",
   "author": "Jason Laster <jlaster@mozilla.com>",
-  "repository": "github:devtools-html/debugger.html",
-  "bugs": "https://github.com/devtools-html/debugger.html/issues",
+  "repository": "github:devtools-html/debugger",
+  "bugs": "https://github.com/firefox-devtools/debugger/issues",
   "homepage":
-    "https://github.com/devtools-html/debugger.html/tree/master/packages/source-maps#readme",
+    "https://github.com/firefox-devtools/debugger/tree/master/packages/source-maps#readme",
   "main": "src/index.js",
   "browser": {
     "./src/utils/wasmAsset.js": "./src/utils/wasmAssetBrowser.js"
@@ -21,7 +21,7 @@
     "babel-plugin-transform-flow-strip-types": "^6.22.0",
     "devtools-utils": "0.0.14",
     "md5": "^2.2.1",
-    "regenerator-runtime": "^0.10.3",
-    "source-map": "^0.7.3"
+    "regenerator-runtime": "^0.13.0",
+    "source-map": "0.8.0-beta.0"
   }
 }

@@ -3,12 +3,10 @@
 exports[`Accordion basic render 1`] = `
 <ul
   className="accordion"
-  role="list"
 >
   <li
     className="accordion-item-1"
     key="0"
-    role="listitem"
   >
     <h2
       className="_header"
@@ -16,11 +14,14 @@ exports[`Accordion basic render 1`] = `
       onKeyDown={[Function]}
       tabIndex="0"
     >
-      <Svg
-        className="expanded"
-        name="arrow"
+      <AccessibleImage
+        className="arrow expanded"
       />
-      Test Accordion Item 1
+      <span
+        className="header-label"
+      >
+        Test Accordion Item 1
+      </span>
     </h2>
     <div
       className="_content"
@@ -31,7 +32,6 @@ exports[`Accordion basic render 1`] = `
   <li
     className="accordion-item-2"
     key="1"
-    role="listitem"
   >
     <h2
       className="_header"
@@ -39,11 +39,14 @@ exports[`Accordion basic render 1`] = `
       onKeyDown={[Function]}
       tabIndex="0"
     >
-      <Svg
-        className=""
-        name="arrow"
+      <AccessibleImage
+        className="arrow "
       />
-      Test Accordion Item 2
+      <span
+        className="header-label"
+      >
+        Test Accordion Item 2
+      </span>
       <div
         className="header-buttons"
         tabIndex="-1"
@@ -55,7 +58,6 @@ exports[`Accordion basic render 1`] = `
   <li
     className="accordion-item-3"
     key="2"
-    role="listitem"
   >
     <h2
       className="_header"
@@ -63,11 +65,14 @@ exports[`Accordion basic render 1`] = `
       onKeyDown={[Function]}
       tabIndex="0"
     >
-      <Svg
-        className="expanded"
-        name="arrow"
+      <AccessibleImage
+        className="arrow expanded"
       />
-      Test Accordion Item 3
+      <span
+        className="header-label"
+      >
+        Test Accordion Item 3
+      </span>
     </h2>
     <div
       className="_content"

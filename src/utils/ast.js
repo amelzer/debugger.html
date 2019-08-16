@@ -4,24 +4,17 @@
 
 // @flow
 
-import { xor, range } from "lodash";
-import { convertToList } from "./pause/pausePoints";
-
-import type { Location, ColumnPosition } from "../types";
+import type { SourceLocation, Position } from "../types";
 import type { Symbols } from "../reducers/ast";
 
 import type {
   AstPosition,
   AstLocation,
-  PausePoints,
   FunctionDeclaration,
   ClassDeclaration
 } from "../workers/parser";
 
-export function findBestMatchExpression(
-  symbols: Symbols,
-  tokenPos: ColumnPosition
-) {
+export function findBestMatchExpression(symbols: Symbols, tokenPos: Position) {
   if (symbols.loading) {
     return null;
   }
@@ -46,25 +39,6 @@ export function findBestMatchExpression(
     }, null);
 }
 
-export function findEmptyLines(sourceText: string, pausePoints: PausePoints) {
-  if (!pausePoints || !sourceText) {
-    return [];
-  }
-
-  const pausePointsList = convertToList(pausePoints);
-
-  const breakpoints = pausePointsList.filter(point => point.types.break);
-  const breakpointLines = breakpoints.map(point => point.location.line);
-
-  if (!sourceText || breakpointLines.length == 0) {
-    return [];
-  }
-
-  const lineCount = sourceText.split("\n").length;
-  const sourceLines = range(1, lineCount + 1);
-  return xor(sourceLines, breakpointLines);
-}
-
 export function containsPosition(a: AstLocation, b: AstPosition) {
   const startsBefore =
     a.start.line < b.line ||
@@ -75,7 +49,7 @@ export function containsPosition(a: AstLocation, b: AstPosition) {
   return startsBefore && endsAfter;
 }
 
-function findClosestofSymbol(declarations: any[], location: Location) {
+function findClosestofSymbol(declarations: any[], location: SourceLocation) {
   if (!declarations) {
     return null;
   }
@@ -111,7 +85,7 @@ function findClosestofSymbol(declarations: any[], location: Location) {
 
 export function findClosestFunction(
   symbols: ?Symbols,
-  location: Location
+  location: SourceLocation
 ): FunctionDeclaration | null {
   if (!symbols || symbols.loading) {
     return null;
@@ -122,7 +96,7 @@ export function findClosestFunction(
 
 export function findClosestClass(
   symbols: Symbols,
-  location: Location
+  location: SourceLocation
 ): ClassDeclaration | null {
   if (!symbols || symbols.loading) {
     return null;

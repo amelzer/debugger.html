@@ -8,8 +8,7 @@ const fs = require("fs");
 const path = require("path");
 var shell = require("shelljs");
 const minimist = require("minimist");
-var chokidar = require('chokidar');
-
+var chokidar = require("chokidar");
 
 const feature = require("devtools-config");
 const getConfig = require("./getConfig");
@@ -19,57 +18,34 @@ const getConfig = require("./getConfig");
 const envConfig = getConfig();
 feature.setConfig(envConfig);
 
-
 function ignoreFile(file) {
-  // We exclude worker files because they are bundled and we include
-  // worker/index.js files because are required by the debugger app in order
-  // to communicate with the worker.
-  if (file.match(/\/workers/) && !file.match(/index.js/)) {
-    return true;
-  }
-
-  return file.match(/(\/fixtures|__mocks__|\/test|vendors\.js|types\.js|types\/)/);
+  return file.match(/(mochitest)/) || fs.statSync(file).isDirectory();
 }
 
 function getFiles() {
-  return glob.sync("./src/**/*.js", {}).filter((file) => !ignoreFile(file));
+  return [...glob.sync("./src/**/*", {}), ...glob.sync("./packages/**/*", {})].filter(file => !ignoreFile(file));
 }
 
-function transformSingleFile(filePath) {
-  const doc = fs.readFileSync(filePath, "utf8");
-  const out = babel.transformSync(doc, {
-    plugins: [
-      "transform-flow-strip-types",
-      "syntax-trailing-function-commas",
-      "transform-class-properties",
-      "transform-es2015-modules-commonjs",
-      "babel-plugin-syntax-object-rest-spread",
-       "transform-react-jsx",
-      ["./.babel/transform-mc", { filePath }]
-    ]
-  });
+function copyFiles() {
+  getFiles().forEach(file => {
+    try {
+      if (ignoreFile(file)) {
+        console.log("IGNORING File: ", file);
+        return;
+      }
 
-  return out.code;
-}
+      console.log("COPYING File: ", file);
 
-function transpileFile(file) {
-  try {
-    if (ignoreFile(file)) {
-      return;
+      const filePath = path.join(__dirname, "..", file);
+      const code = fs.readFileSync(filePath, "utf8");
+
+      shell.mkdir("-p", path.join(mcDebuggerPath, path.dirname(file)));
+      fs.writeFileSync(path.join(mcDebuggerPath, file), code);
+    } catch (e) {
+      console.log(`Failed to copy: ${file}`);
+      console.error(e);
     }
-
-    const filePath = path.join(__dirname, "..", file);
-    const code = transformSingleFile(filePath);
-    shell.mkdir("-p", path.join(mcDebuggerPath, path.dirname(file)));
-    fs.writeFileSync(path.join(mcDebuggerPath, file), code);
-  } catch (e) {
-    console.log(`Failed to transpile: ${file}`)
-    console.error(e);
-  }
-}
-
-function transpileFiles() {
-  getFiles().forEach(transpileFile);
+  });
 }
 
 const MOZ_BUILD_TEMPLATE = `# vim: set filetype=python:
@@ -81,7 +57,7 @@ DIRS += [
 __DIRS__
 ]
 
-DevToolsModules(
+CompiledModules(
 __FILES__
 )
 `;
@@ -93,27 +69,45 @@ __FILES__
 function createMozBuildFiles() {
   const builds = {};
 
-  getFiles().forEach(file => {
-    let dir = path.dirname(file);
-    builds[dir] = builds[dir] || { files: [], dirs: [] };
-
-    // Add the current file to its parent dir moz.build
-    builds[dir].files.push(path.basename(file));
-
-    // There should be a moz.build in every folder between the root and this
-    // file. Climb up the folder hierarchy and make sure a each folder of the
-    // chain is listing in its parent dir moz.build.
-    while (path.dirname(dir) != ".") {
-      const parentDir = path.dirname(dir);
-      const dirName = path.basename(dir);
-
-      builds[parentDir] = builds[parentDir] || { files: [], dirs: [] };
-      if (!builds[parentDir].dirs.includes(dirName)) {
-        builds[parentDir].dirs.push(dirName);
+  getFiles()
+    .filter(file => file.match(/.js$/))
+    .filter(file => {
+      if (file.match(/\/workers\.js/)) {
+        return true;
       }
-      dir = parentDir;
-    }
-  });
+
+     // We exclude worker files because they are bundled and we include
+     // worker/index.js files because are required by the debugger app in order
+     // to communicate with the worker.
+     if (file.match(/\/workers/)) {
+       return file.match(/workers\/(\w|-)*\/index.js/);
+     }
+
+     return !file.match(/(test|types|packages)/)
+
+   })
+    .forEach(file => {
+      // console.log(file)
+      let dir = path.dirname(file);
+      builds[dir] = builds[dir] || { files: [], dirs: [] };
+
+      // Add the current file to its parent dir moz.build
+      builds[dir].files.push(path.basename(file));
+
+      // There should be a moz.build in every folder between the root and this
+      // file. Climb up the folder hierarchy and make sure a each folder of the
+      // chain is listing in its parent dir moz.build.
+      while (path.dirname(dir) != ".") {
+        const parentDir = path.dirname(dir);
+        const dirName = path.basename(dir);
+
+        builds[parentDir] = builds[parentDir] || { files: [], dirs: [] };
+        if (!builds[parentDir].dirs.includes(dirName)) {
+          builds[parentDir].dirs.push(dirName);
+        }
+        dir = parentDir;
+      }
+    });
 
   Object.keys(builds).forEach(build => {
     const { files, dirs } = builds[build];
@@ -132,9 +126,10 @@ function createMozBuildFiles() {
       .map(dir => `    '${dir}',`)
       .join("\n");
 
-    const src = MOZ_BUILD_TEMPLATE
-      .replace("__DIRS__", dirStr)
-      .replace("__FILES__", fileStr);
+    const src = MOZ_BUILD_TEMPLATE.replace("__DIRS__", dirStr).replace(
+      "__FILES__",
+      fileStr
+    );
 
     fs.writeFileSync(path.join(buildPath, "moz.build"), src);
   });
@@ -142,24 +137,22 @@ function createMozBuildFiles() {
 
 function watch() {
   console.log("[copy-modules] start watching");
-  var watcher = chokidar.watch('./src').on('all', (event, path) => {});
+  var watcher = chokidar.watch("./src").on("all", (event, path) => {});
 
-  watcher
-  .on('change', path => {
-    console.log(`Updating ${path}`)
-    transpileFile(path)
-  })
-
+  watcher.on("change", path => {
+    console.log(`Updating ${path}`);
+    copyFile(path);
+  });
 }
 
 function start() {
   console.log("[copy-modules] start");
 
-  console.log("[copy-modules] transpiling debugger modules");
-  transpileFiles();
+  console.log("[copy-modules] copying debugger modules");
+  copyFiles();
 
   console.log("[copy-modules] creating moz.build files");
-  createMozBuildFiles();
+  //createMozBuildFiles();
 
   console.log("[copy-modules] done");
   if (shouldWatch) {
@@ -174,20 +167,17 @@ const args = minimist(process.argv.slice(1), {
 
 const projectPath = path.resolve(__dirname, "..");
 let mcPath = args.mc || feature.getValue("firefox.mcPath");
-let mcDebuggerPath = path.join(mcPath, "devtools/client/debugger/new");
+const mcDebuggerPath = path.join(mcPath, "devtools/client/debugger");
 let shouldWatch = args.watch;
 
-function run({watch, mc}) {
-  shouldWatch = watch
-  mcPath = path.join(mc, "devtools/client/debugger/new");
+function run({ watch, mc }) {
+  shouldWatch = watch;
+  mcPath = path.join(mc, "devtools/client/debugger");
   start();
 }
 
 if (process.argv[1] == __filename) {
   start();
 } else {
-  module.exports = {
-    run,
-    transformSingleFile
-  }
+  module.exports = { run };
 }

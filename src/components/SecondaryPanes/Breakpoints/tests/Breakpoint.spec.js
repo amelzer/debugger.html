@@ -2,11 +2,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
+// @flow
+
 import React from "react";
 import { shallow } from "enzyme";
 
 import Breakpoint from "../Breakpoint";
-import { makeSource, makeOriginalSource } from "../../../../utils/test-head";
+import {
+  createSourceObject,
+  createOriginalSourceObject
+} from "../../../../utils/test-head";
 
 describe("Breakpoint", () => {
   it("simple", () => {
@@ -15,38 +20,35 @@ describe("Breakpoint", () => {
   });
 
   it("disabled", () => {
-    const { component } = render({
-      breakpoint: makeBreakpoint({ disabled: true })
-    });
-    expect(component).toMatchSnapshot();
-  });
-
-  it("selected source is original", () => {
-    const { component } = render({
-      source: makeOriginalSource("foo"),
-      selectedSource: makeOriginalSource("foo")
-    });
+    const { component } = render({}, makeBreakpoint({ disabled: true }));
     expect(component).toMatchSnapshot();
   });
 
   it("paused at a generatedLocation", () => {
     const { component } = render({
-      frame: { generatedLocation, location }
+      frame: { selectedLocation: generatedLocation }
     });
     expect(component).toMatchSnapshot();
   });
 
   it("paused at an original location", () => {
-    const { component } = render({
-      frame: { location, generatedLocation },
-      selectedSource: makeOriginalSource("foo")
-    });
+    const source = createSourceObject("foo");
+    const origSource = createOriginalSourceObject(source);
+
+    const { component } = render(
+      {
+        selectedSource: origSource,
+        frame: { selectedLocation: location }
+      },
+      { location, options: {} }
+    );
+
     expect(component).toMatchSnapshot();
   });
 
   it("paused at a different", () => {
     const { component } = render({
-      frame: { location, generatedLocation: { ...generatedLocation, line: 14 } }
+      frame: { selectedLocation: { ...generatedLocation, line: 14 } }
     });
     expect(component).toMatchSnapshot();
   });
@@ -54,8 +56,10 @@ describe("Breakpoint", () => {
 
 const generatedLocation = { sourceId: "foo", line: 53, column: 73 };
 const location = { sourceId: "foo/original", line: 5, column: 7 };
-function render(overrides = {}) {
-  const props = generateDefaults(overrides);
+
+function render(overrides = {}, breakpointOverrides = {}) {
+  const props = generateDefaults(overrides, breakpointOverrides);
+  // $FlowIgnore
   const component = shallow(<Breakpoint.WrappedComponent {...props} />);
   const defaultState = component.state();
   const instance = component.instance();
@@ -65,22 +69,31 @@ function render(overrides = {}) {
 
 function makeBreakpoint(overrides = {}) {
   return {
-    generatedLocation,
     location,
+    generatedLocation,
     disabled: false,
-    ...overrides
+    options: {},
+    ...overrides,
+    id: 1
   };
 }
 
-function generateDefaults(overrides) {
-  const source = makeSource("foo");
-  const breakpoint = makeBreakpoint();
-  const selectedSource = makeSource("foo");
+function generateDefaults(overrides = {}, breakpointOverrides = {}) {
+  const source = createSourceObject("foo");
+  const breakpoint = makeBreakpoint(breakpointOverrides);
+  const selectedSource = createSourceObject("foo");
   return {
     source,
     breakpoint,
     selectedSource,
-    frame: null,
+    frame: (null: any),
+    editor: {
+      CodeMirror: {
+        runMode: function() {
+          return "";
+        }
+      }
+    },
     ...overrides
   };
 }

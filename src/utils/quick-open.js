@@ -5,14 +5,22 @@
 // @flow
 import classnames from "classnames";
 import { endTruncateStr } from "./utils";
-import { isPretty, getFilename, getSourceClassnames } from "./source";
+import {
+  isPretty,
+  getFilename,
+  getSourceClassnames,
+  getSourceQueryString
+} from "./source";
 
 import type { Location as BabelLocation } from "@babel/types";
 import type { Symbols } from "../reducers/ast";
 import type { QuickOpenType } from "../reducers/quick-open";
-import type { TabList } from "../reducers/tabs";
+import type { Tab } from "../reducers/tabs";
 import type { Source } from "../types";
-import type { SymbolDeclaration } from "../workers/parser";
+import type {
+  SymbolDeclaration,
+  IdentifierDeclaration
+} from "../workers/parser";
 
 export const MODIFIERS = {
   "@": "functions",
@@ -51,14 +59,21 @@ export function parseLineColumn(query: string) {
   }
 }
 
-export function formatSourcesForList(source: Source, tabs: TabList) {
+export function formatSourcesForList(
+  source: Source,
+  tabUrls: Set<$PropertyType<Tab, "url">>
+) {
   const title = getFilename(source);
-  const subtitle = endTruncateStr(source.relativeUrl, 100);
+  const relativeUrlWithQuery = `${source.relativeUrl}${getSourceQueryString(
+    source
+  ) || ""}`;
+  const subtitle = endTruncateStr(relativeUrlWithQuery, 100);
+  const value = relativeUrlWithQuery;
   return {
-    value: source.relativeUrl,
+    value,
     title,
     subtitle,
-    icon: tabs.some(tab => tab.url == source.url)
+    icon: tabUrls.has(source.url)
       ? "tab result-item-icon"
       : classnames(getSourceClassnames(source), "result-item-icon"),
     id: source.id,
@@ -77,11 +92,12 @@ export type QuickOpenResult = {|
 |};
 
 export type FormattedSymbolDeclarations = {|
-  variables: Array<QuickOpenResult>,
   functions: Array<QuickOpenResult>
 |};
 
-export function formatSymbol(symbol: SymbolDeclaration): QuickOpenResult {
+export function formatSymbol(
+  symbol: SymbolDeclaration | IdentifierDeclaration
+): QuickOpenResult {
   return {
     id: `${symbol.name}:${symbol.location.start.line}`,
     title: symbol.name,
@@ -93,13 +109,12 @@ export function formatSymbol(symbol: SymbolDeclaration): QuickOpenResult {
 
 export function formatSymbols(symbols: ?Symbols): FormattedSymbolDeclarations {
   if (!symbols || symbols.loading) {
-    return { variables: [], functions: [] };
+    return { functions: [] };
   }
 
-  const { variables, functions } = symbols;
+  const { functions } = symbols;
 
   return {
-    variables: variables.map(formatSymbol),
     functions: functions.map(formatSymbol)
   };
 }
@@ -125,13 +140,11 @@ export function formatShortcutResults(): Array<QuickOpenResult> {
 }
 
 export function formatSources(
-  sources: { [string]: Source },
-  tabs: TabList
+  sources: Source[],
+  tabUrls: Set<$PropertyType<Tab, "url">>
 ): Array<QuickOpenResult> {
-  const sourceList: Source[] = (Object.values(sources): any);
-
-  return sourceList
+  return sources
     .filter(source => !isPretty(source))
-    .filter(({ relativeUrl }) => !!relativeUrl)
-    .map(source => formatSourcesForList(source, tabs));
+    .filter(source => !!source.relativeUrl && !isPretty(source))
+    .map(source => formatSourcesForList(source, tabUrls));
 }

@@ -5,21 +5,35 @@
 // @flow
 
 import type { Command } from "../../reducers/types";
-import type { Expression, LoadedObject, Frame, Scope, Why } from "../../types";
+import type {
+  Expression,
+  LoadedObject,
+  Frame,
+  Scope,
+  Why,
+  ThreadContext
+} from "../../types";
 
 import type { PromiseAction } from "../utils/middleware/promise";
 
 export type PauseAction =
   | {|
       +type: "BREAK_ON_NEXT",
+      +cx: ThreadContext,
+      +thread: string,
       +value: boolean
     |}
   | {|
+      // Note: Do not include cx, as this action is triggered by the server.
       +type: "RESUME",
-      +value: void
+      +thread: string,
+      +value: void,
+      +wasStepping: boolean
     |}
   | {|
+      // Note: Do not include cx, as this action is triggered by the server.
       +type: "PAUSED",
+      +thread: string,
       +why: Why,
       +scopes: Scope,
       +frames: Frame[],
@@ -33,23 +47,25 @@ export type PauseAction =
     |}
   | PromiseAction<{|
       +type: "COMMAND",
+      +cx: ThreadContext,
+      +thread: string,
       +command: Command
     |}>
   | {|
       +type: "SELECT_FRAME",
+      +cx: ThreadContext,
+      +thread: string,
       +frame: Frame
     |}
   | {|
       +type: "SELECT_COMPONENT",
+      +thread: string,
       +componentIndex: number
     |}
   | {|
-      +type: "SET_POPUP_OBJECT_PROPERTIES",
-      +objectId: string,
-      +properties: Object
-    |}
-  | {|
       +type: "ADD_EXPRESSION",
+      +cx: ThreadContext,
+      +thread: string,
       +id: number,
       +input: string,
       +value: string,
@@ -58,17 +74,21 @@ export type PauseAction =
   | PromiseAction<
       {|
         +type: "EVALUATE_EXPRESSION",
+        +cx: ThreadContext,
+        +thread: string,
         +input: string
       |},
       Object
     >
   | PromiseAction<{|
       +type: "EVALUATE_EXPRESSIONS",
+      +cx: ThreadContext,
       +results: Expression[],
       +inputs: string[]
     |}>
   | {|
       +type: "UPDATE_EXPRESSION",
+      +cx: ThreadContext,
       +expression: Expression,
       +input: string,
       +expressionError: ?string
@@ -85,12 +105,15 @@ export type PauseAction =
     |}
   | {|
       +type: "AUTOCOMPLETE",
+      +cx: ThreadContext,
       +input: string,
       +result: Object
     |}
   | PromiseAction<
       {|
         +type: "MAP_SCOPES",
+        +cx: ThreadContext,
+        +thread: string,
         +frame: Frame
       |},
       {
@@ -102,20 +125,26 @@ export type PauseAction =
     >
   | {|
       +type: "MAP_FRAMES",
-      +frames: Frame[]
-    |}
-  | {|
-      +type: "ADD_EXTRA",
-      +extra: any
+      +cx: ThreadContext,
+      +thread: string,
+      +frames: Frame[],
+      +selectedFrameId: string
     |}
   | PromiseAction<
       {|
         +type: "ADD_SCOPES",
+        +cx: ThreadContext,
+        +thread: string,
         +frame: Frame
       |},
       Scope
     >
   | {|
       +type: "TOGGLE_SKIP_PAUSING",
+      +thread: string,
       skipPausing: boolean
+    |}
+  | {|
+      +type: "TOGGLE_MAP_SCOPES",
+      +mapScopes: boolean
     |};

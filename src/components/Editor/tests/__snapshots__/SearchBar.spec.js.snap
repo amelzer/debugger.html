@@ -9,15 +9,13 @@ exports[`SearchBar should render 1`] = `
     handleNext={[Function]}
     handlePrev={[Function]}
     hasPrefix={false}
-    onBlur={[Function]}
+    isLoading={false}
     onChange={[Function]}
-    onFocus={[Function]}
     onHistoryScroll={[Function]}
     onKeyDown={[Function]}
     placeholder="Find in file…"
     query=""
     selectedItemId=""
-    shouldFocus={false}
     showClose={false}
     showErrorEmoji={false}
     size=""
@@ -29,6 +27,9 @@ exports[`SearchBar should render 1`] = `
     <div
       className="search-modifiers"
     >
+      <span
+        className="pipe-divider"
+      />
       <span
         className="search-type-name"
       >
@@ -52,16 +53,16 @@ exports[`SearchBar should render 1`] = `
         svgName="whole-word-match"
         tooltip="Whole word"
       />
-      <React.Fragment>
-        <span
-          className="pipe-divider"
-        />
-        <CloseButton
-          buttonClass="big"
-          handleClick={[Function]}
-        />
-      </React.Fragment>
     </div>
+    <React.Fragment>
+      <span
+        className="pipe-divider"
+      />
+      <CloseButton
+        buttonClass="big"
+        handleClick={[Function]}
+      />
+    </React.Fragment>
   </div>
 </div>
 `;
@@ -78,15 +79,13 @@ exports[`showErrorEmoji false if no query + no results 1`] = `
     handleNext={[Function]}
     handlePrev={[Function]}
     hasPrefix={false}
-    onBlur={[Function]}
+    isLoading={false}
     onChange={[Function]}
-    onFocus={[Function]}
     onHistoryScroll={[Function]}
     onKeyDown={[Function]}
     placeholder="Find in file…"
     query=""
     selectedItemId=""
-    shouldFocus={false}
     showClose={false}
     showErrorEmoji={false}
     size=""
@@ -98,6 +97,9 @@ exports[`showErrorEmoji false if no query + no results 1`] = `
     <div
       className="search-modifiers"
     >
+      <span
+        className="pipe-divider"
+      />
       <span
         className="search-type-name"
       >
@@ -121,16 +123,16 @@ exports[`showErrorEmoji false if no query + no results 1`] = `
         svgName="whole-word-match"
         tooltip="Whole word"
       />
-      <React.Fragment>
-        <span
-          className="pipe-divider"
-        />
-        <CloseButton
-          buttonClass="big"
-          handleClick={[Function]}
-        />
-      </React.Fragment>
     </div>
+    <React.Fragment>
+      <span
+        className="pipe-divider"
+      />
+      <CloseButton
+        buttonClass="big"
+        handleClick={[Function]}
+      />
+    </React.Fragment>
   </div>
 </div>
 `;
@@ -145,15 +147,13 @@ exports[`showErrorEmoji false if query + results 1`] = `
     handleNext={[Function]}
     handlePrev={[Function]}
     hasPrefix={false}
-    onBlur={[Function]}
+    isLoading={false}
     onChange={[Function]}
-    onFocus={[Function]}
     onHistoryScroll={[Function]}
     onKeyDown={[Function]}
     placeholder="Find in file…"
     query="test"
     selectedItemId=""
-    shouldFocus={false}
     showClose={false}
     showErrorEmoji={false}
     size=""
@@ -165,6 +165,9 @@ exports[`showErrorEmoji false if query + results 1`] = `
     <div
       className="search-modifiers"
     >
+      <span
+        className="pipe-divider"
+      />
       <span
         className="search-type-name"
       >
@@ -188,16 +191,16 @@ exports[`showErrorEmoji false if query + results 1`] = `
         svgName="whole-word-match"
         tooltip="Whole word"
       />
-      <React.Fragment>
-        <span
-          className="pipe-divider"
-        />
-        <CloseButton
-          buttonClass="big"
-          handleClick={[Function]}
-        />
-      </React.Fragment>
     </div>
+    <React.Fragment>
+      <span
+        className="pipe-divider"
+      />
+      <CloseButton
+        buttonClass="big"
+        handleClick={[Function]}
+      />
+    </React.Fragment>
   </div>
 </div>
 `;
@@ -212,19 +215,17 @@ exports[`showErrorEmoji true if query + no results 1`] = `
     handleNext={[Function]}
     handlePrev={[Function]}
     hasPrefix={false}
-    onBlur={[Function]}
+    isLoading={false}
     onChange={[Function]}
-    onFocus={[Function]}
     onHistoryScroll={[Function]}
     onKeyDown={[Function]}
     placeholder="Find in file…"
     query="test"
     selectedItemId=""
-    shouldFocus={false}
     showClose={false}
     showErrorEmoji={true}
     size=""
-    summaryMsg="No results"
+    summaryMsg="No results found"
   />
   <div
     className="search-bottom-bar"
@@ -232,6 +233,9 @@ exports[`showErrorEmoji true if query + no results 1`] = `
     <div
       className="search-modifiers"
     >
+      <span
+        className="pipe-divider"
+      />
       <span
         className="search-type-name"
       >
@@ -255,16 +259,16 @@ exports[`showErrorEmoji true if query + no results 1`] = `
         svgName="whole-word-match"
         tooltip="Whole word"
       />
-      <React.Fragment>
-        <span
-          className="pipe-divider"
-        />
-        <CloseButton
-          buttonClass="big"
-          handleClick={[Function]}
-        />
-      </React.Fragment>
     </div>
+    <React.Fragment>
+      <span
+        className="pipe-divider"
+      />
+      <CloseButton
+        buttonClass="big"
+        handleClick={[Function]}
+      />
+    </React.Fragment>
   </div>
 </div>
 `;

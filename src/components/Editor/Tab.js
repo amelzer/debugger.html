@@ -5,7 +5,7 @@
 // @flow
 
 import React, { PureComponent } from "react";
-import { connect } from "react-redux";
+import { connect } from "../../utils/connect";
 
 import { showMenu, buildMenu } from "devtools-contextmenu";
 
@@ -13,16 +13,18 @@ import SourceIcon from "../shared/SourceIcon";
 import { CloseButton } from "../shared/Button";
 
 import type { List } from "immutable";
-import type { Source } from "../../types";
+import type { Source, Context } from "../../types";
 
 import actions from "../../actions";
 
 import {
+  getDisplayPath,
   getFileURL,
   getRawSourceURL,
+  getSourceQueryString,
   getTruncatedFileName,
-  getDisplayPath,
-  isPretty
+  isPretty,
+  shouldBlackbox
 } from "../../utils/source";
 import { copyToTheClipboard } from "../../utils/clipboard";
 import { getTabMenuItems } from "../../utils/tabs";
@@ -30,23 +32,29 @@ import { getTabMenuItems } from "../../utils/tabs";
 import {
   getSelectedSource,
   getActiveSearch,
-  getSourcesForTabs
+  getSourcesForTabs,
+  getHasSiblingOfSameName,
+  getContext
 } from "../../selectors";
+import type { ActiveSearchType } from "../../selectors";
 
 import classnames from "classnames";
 
 type SourcesList = List<Source>;
 
 type Props = {
+  cx: Context,
   tabSources: SourcesList,
   selectedSource: Source,
   source: Source,
-  activeSearch: string,
-  selectSource: string => void,
-  closeTab: Source => void,
-  closeTabs: (List<string>) => void,
-  togglePrettyPrint: string => void,
-  showSource: string => void
+  activeSearch: ActiveSearchType,
+  hasSiblingOfSameName: boolean,
+  selectSource: typeof actions.selectSource,
+  closeTab: typeof actions.closeTab,
+  closeTabs: typeof actions.closeTabs,
+  togglePrettyPrint: typeof actions.togglePrettyPrint,
+  showSource: typeof actions.showSource,
+  toggleBlackBox: typeof actions.toggleBlackBox
 };
 
 class Tab extends PureComponent<Props> {
@@ -57,14 +65,18 @@ class Tab extends PureComponent<Props> {
 
   showContextMenu(e, tab: string) {
     const {
+      cx,
       closeTab,
       closeTabs,
       tabSources,
       showSource,
+      toggleBlackBox,
       togglePrettyPrint,
-      selectedSource
+      selectedSource,
+      source
     } = this.props;
 
+    const tabCount = tabSources.length;
     const otherTabs = tabSources.filter(t => t.id !== tab);
     const sourceTab = tabSources.find(t => t.id == tab);
     const tabURLs = tabSources.map(t => t.url);
@@ -74,36 +86,38 @@ class Tab extends PureComponent<Props> {
       return;
     }
 
-    const isPrettySource = isPretty(sourceTab);
     const tabMenuItems = getTabMenuItems();
     const items = [
       {
         item: {
           ...tabMenuItems.closeTab,
-          click: () => closeTab(sourceTab)
+          click: () => closeTab(cx, sourceTab)
         }
       },
       {
         item: {
           ...tabMenuItems.closeOtherTabs,
-          click: () => closeTabs(otherTabURLs)
-        },
-        hidden: () => tabSources.size === 1
+          click: () => closeTabs(cx, otherTabURLs),
+          disabled: otherTabURLs.length === 0
+        }
       },
       {
         item: {
           ...tabMenuItems.closeTabsToEnd,
           click: () => {
             const tabIndex = tabSources.findIndex(t => t.id == tab);
-            closeTabs(tabURLs.filter((t, i) => i > tabIndex));
-          }
-        },
-        hidden: () =>
-          tabSources.size === 1 ||
-          tabSources.some((t, i) => t === tab && tabSources.size - 1 === i)
+            closeTabs(cx, tabURLs.filter((t, i) => i > tabIndex));
+          },
+          disabled:
+            tabCount === 1 ||
+            tabSources.some((t, i) => t === tab && tabCount - 1 === i)
+        }
       },
       {
-        item: { ...tabMenuItems.closeAllTabs, click: () => closeTabs(tabURLs) }
+        item: {
+          ...tabMenuItems.closeAllTabs,
+          click: () => closeTabs(cx, tabURLs)
+        }
       },
       { item: { type: "separator" } },
       {
@@ -124,19 +138,27 @@ class Tab extends PureComponent<Props> {
         item: {
           ...tabMenuItems.showSource,
           disabled: !selectedSource.url,
-          click: () => showSource(tab)
+          click: () => showSource(cx, tab)
+        }
+      },
+      {
+        item: {
+          ...tabMenuItems.toggleBlackBox,
+          label: source.isBlackBoxed
+            ? L10N.getStr("sourceFooter.unblackbox")
+            : L10N.getStr("sourceFooter.blackbox"),
+          disabled: !shouldBlackbox(source),
+          click: () => toggleBlackBox(cx, source)
+        }
+      },
+      {
+        item: {
+          ...tabMenuItems.prettyPrint,
+          click: () => togglePrettyPrint(cx, tab),
+          disabled: isPretty(sourceTab)
         }
       }
     ];
-
-    if (!isPrettySource) {
-      items.push({
-        item: {
-          ...tabMenuItems.prettyPrint,
-          click: () => togglePrettyPrint(tab)
-        }
-      });
-    }
 
     showMenu(e, buildMenu(items));
   }
@@ -151,11 +173,13 @@ class Tab extends PureComponent<Props> {
 
   render() {
     const {
+      cx,
       selectedSource,
       selectSource,
       closeTab,
       source,
-      tabSources
+      tabSources,
+      hasSiblingOfSameName
     } = this.props;
     const sourceId = source.id;
     const active =
@@ -166,13 +190,13 @@ class Tab extends PureComponent<Props> {
 
     function onClickClose(e) {
       e.stopPropagation();
-      closeTab(source);
+      closeTab(cx, source);
     }
 
     function handleTabClick(e) {
       e.preventDefault();
       e.stopPropagation();
-      return selectSource(sourceId);
+      return selectSource(cx, sourceId);
     }
 
     const className = classnames("source-tab", {
@@ -181,6 +205,7 @@ class Tab extends PureComponent<Props> {
     });
 
     const path = getDisplayPath(source, tabSources);
+    const query = hasSiblingOfSameName ? getSourceQueryString(source) : "";
 
     return (
       <div
@@ -188,16 +213,16 @@ class Tab extends PureComponent<Props> {
         key={sourceId}
         onClick={handleTabClick}
         // Accommodate middle click to close tab
-        onMouseUp={e => e.button === 1 && closeTab(source)}
+        onMouseUp={e => e.button === 1 && closeTab(cx, source)}
         onContextMenu={e => this.onTabContextMenu(e, sourceId)}
-        title={getFileURL(source)}
+        title={getFileURL(source, false)}
       >
         <SourceIcon
           source={source}
           shouldHide={icon => ["file", "javascript"].includes(icon)}
         />
         <div className="filename">
-          {getTruncatedFileName(source)}
+          {getTruncatedFileName(source, query)}
           {path && <span>{`../${path}/..`}</span>}
         </div>
         <CloseButton
@@ -213,9 +238,11 @@ const mapStateToProps = (state, { source }) => {
   const selectedSource = getSelectedSource(state);
 
   return {
+    cx: getContext(state),
     tabSources: getSourcesForTabs(state),
     selectedSource: selectedSource,
-    activeSearch: getActiveSearch(state)
+    activeSearch: getActiveSearch(state),
+    hasSiblingOfSameName: getHasSiblingOfSameName(state, source)
   };
 };
 
@@ -226,6 +253,7 @@ export default connect(
     closeTab: actions.closeTab,
     closeTabs: actions.closeTabs,
     togglePrettyPrint: actions.togglePrettyPrint,
-    showSource: actions.showSource
+    showSource: actions.showSource,
+    toggleBlackBox: actions.toggleBlackBox
   }
 )(Tab);

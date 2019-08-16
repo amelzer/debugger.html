@@ -1,26 +1,54 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
 exports[`Frame getFrameTitle 1`] = `
-<li
+<div
   className="frame"
   key="1"
   onContextMenu={[Function]}
   onKeyUp={[Function]}
   onMouseDown={[Function]}
+  role="listitem"
   tabIndex={0}
   title="Jump to https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com/assets/src/js/foo-view.js:10"
 >
+  <FrameIndent />
   <FrameTitle
     frame={
       Object {
         "displayName": "renderFoo",
-        "id": 1,
+        "generatedLocation": Object {
+          "line": 10,
+          "sourceId": "source",
+        },
+        "id": "1",
         "location": Object {
           "line": 10,
+          "sourceId": "source",
+        },
+        "scope": Object {
+          "actor": "scope-actor",
+          "bindings": Object {
+            "arguments": Array [],
+            "variables": Object {},
+          },
+          "function": null,
+          "object": null,
+          "parent": null,
+          "type": "block",
         },
         "source": Object {
+          "id": "source",
+          "introductionType": undefined,
+          "introductionUrl": null,
+          "isBlackBoxed": false,
+          "isExtension": false,
+          "isPrettyPrinted": false,
+          "isWasm": false,
+          "relativeUrl": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com/assets/src/js/foo-view.js",
           "url": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com/assets/src/js/foo-view.js",
         },
+        "this": Object {},
+        "thread": "FakeThread",
       }
     }
     options={
@@ -29,46 +57,107 @@ exports[`Frame getFrameTitle 1`] = `
       }
     }
   />
+  <span
+    className="clipboard-only"
+  >
+     
+  </span>
   <FrameLocation
+    displayFullUrl={false}
     frame={
       Object {
         "displayName": "renderFoo",
-        "id": 1,
+        "generatedLocation": Object {
+          "line": 10,
+          "sourceId": "source",
+        },
+        "id": "1",
         "location": Object {
           "line": 10,
+          "sourceId": "source",
+        },
+        "scope": Object {
+          "actor": "scope-actor",
+          "bindings": Object {
+            "arguments": Array [],
+            "variables": Object {},
+          },
+          "function": null,
+          "object": null,
+          "parent": null,
+          "type": "block",
         },
         "source": Object {
+          "id": "source",
+          "introductionType": undefined,
+          "introductionUrl": null,
+          "isBlackBoxed": false,
+          "isExtension": false,
+          "isPrettyPrinted": false,
+          "isWasm": false,
+          "relativeUrl": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com/assets/src/js/foo-view.js",
           "url": "https://aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa.com/assets/src/js/foo-view.js",
         },
+        "this": Object {},
+        "thread": "FakeThread",
       }
     }
   />
-</li>
+  <br
+    className="clipboard-only"
+  />
+</div>
 `;
 
 exports[`Frame library frame 1`] = `
-<li
+<div
   className="frame selected"
   key="3"
   onContextMenu={[Function]}
   onKeyUp={[Function]}
   onMouseDown={[Function]}
+  role="listitem"
   tabIndex={0}
 >
+  <FrameIndent />
   <FrameTitle
     frame={
       Object {
         "displayName": "updateEvents",
-        "frameworkGroupingOn": false,
-        "id": 3,
+        "generatedLocation": Object {
+          "line": 12,
+          "sourceId": "source",
+        },
+        "id": "3",
         "library": "backbone",
         "location": Object {
           "line": 12,
+          "sourceId": "source",
+        },
+        "scope": Object {
+          "actor": "scope-actor",
+          "bindings": Object {
+            "arguments": Array [],
+            "variables": Object {},
+          },
+          "function": null,
+          "object": null,
+          "parent": null,
+          "type": "block",
         },
         "source": Object {
+          "id": "source",
+          "introductionType": undefined,
+          "introductionUrl": null,
+          "isBlackBoxed": false,
+          "isExtension": false,
+          "isPrettyPrinted": false,
+          "isWasm": false,
+          "relativeUrl": "backbone.js",
           "url": "backbone.js",
         },
-        "toggleFrameworkGrouping": [MockFunction],
+        "this": Object {},
+        "thread": "FakeThread",
       }
     }
     options={
@@ -77,50 +166,107 @@ exports[`Frame library frame 1`] = `
       }
     }
   />
+  <span
+    className="clipboard-only"
+  >
+     
+  </span>
   <FrameLocation
+    displayFullUrl={false}
     frame={
       Object {
         "displayName": "updateEvents",
-        "frameworkGroupingOn": false,
-        "id": 3,
+        "generatedLocation": Object {
+          "line": 12,
+          "sourceId": "source",
+        },
+        "id": "3",
         "library": "backbone",
         "location": Object {
           "line": 12,
+          "sourceId": "source",
+        },
+        "scope": Object {
+          "actor": "scope-actor",
+          "bindings": Object {
+            "arguments": Array [],
+            "variables": Object {},
+          },
+          "function": null,
+          "object": null,
+          "parent": null,
+          "type": "block",
         },
         "source": Object {
+          "id": "source",
+          "introductionType": undefined,
+          "introductionUrl": null,
+          "isBlackBoxed": false,
+          "isExtension": false,
+          "isPrettyPrinted": false,
+          "isWasm": false,
+          "relativeUrl": "backbone.js",
           "url": "backbone.js",
         },
-        "toggleFrameworkGrouping": [MockFunction],
+        "this": Object {},
+        "thread": "FakeThread",
       }
     }
   />
-</li>
+  <br
+    className="clipboard-only"
+  />
+</div>
 `;
 
 exports[`Frame user frame (not selected) 1`] = `
-<li
+<div
   className="frame"
   key="1"
   onContextMenu={[Function]}
   onKeyUp={[Function]}
   onMouseDown={[Function]}
+  role="listitem"
   tabIndex={0}
 >
+  <FrameIndent />
   <FrameTitle
     frame={
       Object {
         "displayName": "renderFoo",
-        "frameworkGroupingOn": false,
-        "id": 1,
-        "library": false,
+        "generatedLocation": Object {
+          "line": 10,
+          "sourceId": "source",
+        },
+        "id": "1",
         "location": Object {
           "line": 10,
+          "sourceId": "source",
+        },
+        "scope": Object {
+          "actor": "scope-actor",
+          "bindings": Object {
+            "arguments": Array [],
+            "variables": Object {},
+          },
+          "function": null,
+          "object": null,
+          "parent": null,
+          "type": "block",
         },
         "source": Object {
+          "id": "source",
+          "introductionType": undefined,
+          "introductionUrl": null,
           "isBlackBoxed": false,
+          "isExtension": false,
+          "isPrettyPrinted": false,
+          "isWasm": false,
+          "relativeUrl": "foo-view.js",
           "url": "foo-view.js",
         },
-        "toggleFrameworkGrouping": [MockFunction],
+        "this": Object {},
+        "thread": "FakeThread",
       }
     }
     options={
@@ -129,51 +275,106 @@ exports[`Frame user frame (not selected) 1`] = `
       }
     }
   />
+  <span
+    className="clipboard-only"
+  >
+     
+  </span>
   <FrameLocation
+    displayFullUrl={false}
     frame={
       Object {
         "displayName": "renderFoo",
-        "frameworkGroupingOn": false,
-        "id": 1,
-        "library": false,
+        "generatedLocation": Object {
+          "line": 10,
+          "sourceId": "source",
+        },
+        "id": "1",
         "location": Object {
           "line": 10,
+          "sourceId": "source",
+        },
+        "scope": Object {
+          "actor": "scope-actor",
+          "bindings": Object {
+            "arguments": Array [],
+            "variables": Object {},
+          },
+          "function": null,
+          "object": null,
+          "parent": null,
+          "type": "block",
         },
         "source": Object {
+          "id": "source",
+          "introductionType": undefined,
+          "introductionUrl": null,
           "isBlackBoxed": false,
+          "isExtension": false,
+          "isPrettyPrinted": false,
+          "isWasm": false,
+          "relativeUrl": "foo-view.js",
           "url": "foo-view.js",
         },
-        "toggleFrameworkGrouping": [MockFunction],
+        "this": Object {},
+        "thread": "FakeThread",
       }
     }
   />
-</li>
+  <br
+    className="clipboard-only"
+  />
+</div>
 `;
 
 exports[`Frame user frame 1`] = `
-<li
+<div
   className="frame selected"
   key="1"
   onContextMenu={[Function]}
   onKeyUp={[Function]}
   onMouseDown={[Function]}
+  role="listitem"
   tabIndex={0}
 >
+  <FrameIndent />
   <FrameTitle
     frame={
       Object {
         "displayName": "renderFoo",
-        "frameworkGroupingOn": false,
-        "id": 1,
-        "library": false,
+        "generatedLocation": Object {
+          "line": 10,
+          "sourceId": "source",
+        },
+        "id": "1",
         "location": Object {
           "line": 10,
+          "sourceId": "source",
+        },
+        "scope": Object {
+          "actor": "scope-actor",
+          "bindings": Object {
+            "arguments": Array [],
+            "variables": Object {},
+          },
+          "function": null,
+          "object": null,
+          "parent": null,
+          "type": "block",
         },
         "source": Object {
+          "id": "source",
+          "introductionType": undefined,
+          "introductionUrl": null,
           "isBlackBoxed": false,
+          "isExtension": false,
+          "isPrettyPrinted": false,
+          "isWasm": false,
+          "relativeUrl": "foo-view.js",
           "url": "foo-view.js",
         },
-        "toggleFrameworkGrouping": [MockFunction],
+        "this": Object {},
+        "thread": "FakeThread",
       }
     }
     options={
@@ -182,23 +383,54 @@ exports[`Frame user frame 1`] = `
       }
     }
   />
+  <span
+    className="clipboard-only"
+  >
+     
+  </span>
   <FrameLocation
+    displayFullUrl={false}
     frame={
       Object {
         "displayName": "renderFoo",
-        "frameworkGroupingOn": false,
-        "id": 1,
-        "library": false,
+        "generatedLocation": Object {
+          "line": 10,
+          "sourceId": "source",
+        },
+        "id": "1",
         "location": Object {
           "line": 10,
+          "sourceId": "source",
+        },
+        "scope": Object {
+          "actor": "scope-actor",
+          "bindings": Object {
+            "arguments": Array [],
+            "variables": Object {},
+          },
+          "function": null,
+          "object": null,
+          "parent": null,
+          "type": "block",
         },
         "source": Object {
+          "id": "source",
+          "introductionType": undefined,
+          "introductionUrl": null,
           "isBlackBoxed": false,
+          "isExtension": false,
+          "isPrettyPrinted": false,
+          "isWasm": false,
+          "relativeUrl": "foo-view.js",
           "url": "foo-view.js",
         },
-        "toggleFrameworkGrouping": [MockFunction],
+        "this": Object {},
+        "thread": "FakeThread",
       }
     }
   />
-</li>
+  <br
+    className="clipboard-only"
+  />
+</div>
 `;

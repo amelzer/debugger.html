@@ -4,15 +4,22 @@
 
 // @flow
 
-import type { Frame, Scope, Why, Worker } from "../../types";
+import typeof SourceMaps from "devtools-source-map";
+import type { WorkerList, MainThread, Context, ThreadId } from "../../types";
 import type { State } from "../../reducers/types";
 import type { MatchedLocations } from "../../reducers/file-search";
+import type { TreeNode } from "../../utils/sources-tree/types";
+import type { SearchOperation } from "../../reducers/project-text-search";
 
 import type { BreakpointAction } from "./BreakpointAction";
 import type { SourceAction } from "./SourceAction";
+import type { SourceActorAction } from "./SourceActorAction";
 import type { UIAction } from "./UIAction";
 import type { PauseAction } from "./PauseAction";
 import type { ASTAction } from "./ASTAction";
+import { clientCommands } from "../../client/firefox";
+import type { Panel } from "../../client/firefox/types";
+import type { ParserDispatcher } from "../../workers/parser";
 
 /**
  * Flow types
@@ -28,11 +35,13 @@ import type { ASTAction } from "./ASTAction";
  */
 export type ThunkArgs = {
   dispatch: (action: any) => Promise<any>,
+  forkedDispatch: (action: any) => Promise<any>,
   getState: () => State,
-  client: any,
-  sourceMaps: any,
-  openLink: (url: string) => void,
-  openWorkerToolbox: (worker: Worker) => void
+  client: typeof clientCommands,
+  sourceMaps: SourceMaps,
+  parser: ParserDispatcher,
+  evaluationsParser: ParserDispatcher,
+  panel: Panel
 };
 
 export type Thunk = ThunkArgs => any;
@@ -61,44 +70,31 @@ type UpdateTabAction = {|
   +sourceId?: string
 |};
 
-type ReplayAction =
-  | {|
-      +type: "TRAVEL_TO",
-      +data: {
-        paused: {
-          why: Why,
-          scopes: Scope[],
-          frames: Frame[],
-          selectedFrameId: string,
-          loadedObjects: Object
-        },
-        expressions?: Object[]
-      },
-      +position: number
-    |}
-  | {|
-      +type: "CLEAR_HISTORY"
-    |};
-
 type NavigateAction =
-  | {| +type: "CONNECT", +url: string, +canRewind: boolean |}
-  | {| +type: "NAVIGATE", +url: string |};
+  | {| +type: "CONNECT", +mainThread: MainThread, +canRewind: boolean |}
+  | {| +type: "NAVIGATE", +mainThread: MainThread |};
 
-export type SourceTreeAction = {|
-  +type: "SET_EXPANDED_STATE",
-  +expanded: any
-|};
+export type FocusItem = TreeNode;
+
+export type SourceTreeAction =
+  | {| +type: "SET_EXPANDED_STATE", +thread: string, +expanded: any |}
+  | {| +type: "SET_FOCUSED_SOURCE_ITEM", +cx: Context, item: FocusItem |};
 
 export type ProjectTextSearchAction =
-  | {| +type: "ADD_QUERY", +query: string |}
+  | {| +type: "ADD_QUERY", +cx: Context, +query: string |}
   | {|
       +type: "ADD_SEARCH_RESULT",
+      +cx: Context,
       +result: ProjectTextSearchResult
     |}
-  | {| +type: "CLEAR_QUERY" |}
-  | {| +type: "UPDATE_STATUS", +status: string |}
-  | {| +type: "CLEAR_SEARCH_RESULTS" |}
-  | {| +type: "CLEAR_SEARCH" |};
+  | {| +type: "UPDATE_STATUS", +cx: Context, +status: string |}
+  | {| +type: "CLEAR_SEARCH_RESULTS", +cx: Context |}
+  | {|
+      +type: "ADD_ONGOING_SEARCH",
+      +cx: Context,
+      +ongoingSearch: SearchOperation
+    |}
+  | {| +type: "CLEAR_SEARCH", +cx: Context |};
 
 export type FileTextSearchModifier =
   | "caseSensitive"
@@ -108,14 +104,17 @@ export type FileTextSearchModifier =
 export type FileTextSearchAction =
   | {|
       +type: "TOGGLE_FILE_SEARCH_MODIFIER",
+      +cx: Context,
       +modifier: FileTextSearchModifier
     |}
   | {|
       +type: "UPDATE_FILE_SEARCH_QUERY",
+      +cx: Context,
       +query: string
     |}
   | {|
       +type: "UPDATE_SEARCH_RESULTS",
+      +cx: Context,
       +results: {
         matches: MatchedLocations[],
         matchIndex: number,
@@ -129,17 +128,22 @@ export type QuickOpenAction =
   | {| +type: "OPEN_QUICK_OPEN", +query?: string |}
   | {| +type: "CLOSE_QUICK_OPEN" |};
 
-export type CoverageAction = {|
-  +type: "RECORD_COVERAGE",
-  +value: { coverage: Object }
-|};
-
-export type DebugeeAction = {|
-  +type: "SET_WORKERS",
-  +workers: {
-    workers: Object[]
-  }
-|};
+export type DebuggeeAction =
+  | {|
+      +type: "INSERT_WORKERS",
+      +cx: Context,
+      +workers: WorkerList
+    |}
+  | {|
+      +type: "REMOVE_WORKERS",
+      +cx: Context,
+      +workers: Array<ThreadId>
+    |}
+  | {|
+      +type: "SELECT_THREAD",
+      +cx: Context,
+      +thread: ThreadId
+    |};
 
 export type {
   StartPromiseAction,
@@ -160,6 +164,7 @@ export type { ASTAction } from "./ASTAction";
 export type Action =
   | AddTabAction
   | UpdateTabAction
+  | SourceActorAction
   | SourceAction
   | BreakpointAction
   | PauseAction
@@ -169,6 +174,5 @@ export type Action =
   | QuickOpenAction
   | FileTextSearchAction
   | ProjectTextSearchAction
-  | CoverageAction
-  | DebugeeAction
-  | ReplayAction;
+  | DebuggeeAction
+  | SourceTreeAction;

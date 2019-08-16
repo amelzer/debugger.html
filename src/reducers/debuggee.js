@@ -9,40 +9,87 @@
  * @module reducers/debuggee
  */
 
-import { List } from "immutable";
-import type { Record } from "../utils/makeRecord";
-import type { Worker } from "../types";
+import { sortBy } from "lodash";
+import { createSelector } from "reselect";
+
+import { getDisplayName } from "../utils/workers";
+
+import type { Selector } from "./types";
+import type { MainThread, WorkerList, Thread } from "../types";
 import type { Action } from "../actions/types";
-import makeRecord from "../utils/makeRecord";
 
-export type WorkersList = List<Worker>;
-
-type DebuggeeState = {
-  workers: WorkersList
+export type DebuggeeState = {
+  workers: WorkerList,
+  mainThread: MainThread
 };
 
-export const createDebuggeeState = makeRecord(
-  ({
-    workers: List()
-  }: DebuggeeState)
-);
+export function initialDebuggeeState(): DebuggeeState {
+  return {
+    workers: [],
+    mainThread: { actor: "", url: "", type: -1, name: "" }
+  };
+}
 
 export default function debuggee(
-  state: Record<DebuggeeState> = createDebuggeeState(),
+  state: DebuggeeState = initialDebuggeeState(),
   action: Action
-): Record<DebuggeeState> {
+): DebuggeeState {
   switch (action.type) {
-    case "SET_WORKERS":
-      return state.set("workers", List(action.workers));
+    case "CONNECT":
+      return {
+        ...state,
+        mainThread: { ...action.mainThread, name: L10N.getStr("mainThread") }
+      };
+    case "INSERT_WORKERS":
+      return insertWorkers(state, action.workers);
+    case "REMOVE_WORKERS":
+      const { workers } = action;
+      return {
+        ...state,
+        workers: state.workers.filter(w => !workers.includes(w.actor))
+      };
+    case "NAVIGATE":
+      return {
+        ...initialDebuggeeState(),
+        mainThread: action.mainThread
+      };
     default:
       return state;
   }
 }
 
+function insertWorkers(state, workers) {
+  const formatedWorkers = workers.map(worker => ({
+    ...worker,
+    name: getDisplayName(worker)
+  }));
+
+  return {
+    ...state,
+    workers: [...state.workers, ...formatedWorkers]
+  };
+}
+
 export const getWorkers = (state: OuterState) => state.debuggee.workers;
 
-type OuterState = { debuggee: DebuggeeState };
+export const getWorkerCount = (state: OuterState) => getWorkers(state).length;
 
-export function getWorker(state: OuterState, url: string) {
-  return getWorkers(state).find(value => url);
+export function getWorkerByThread(state: OuterState, thread: string) {
+  return getWorkers(state).find(worker => worker.actor == thread);
 }
+
+export function getMainThread(state: OuterState): MainThread {
+  return state.debuggee.mainThread;
+}
+
+export function getDebuggeeUrl(state: OuterState): string {
+  return getMainThread(state).url;
+}
+
+export const getThreads: Selector<Thread[]> = createSelector(
+  getMainThread,
+  getWorkers,
+  (mainThread, workers) => [mainThread, ...sortBy(workers, getDisplayName)]
+);
+
+type OuterState = { debuggee: DebuggeeState };

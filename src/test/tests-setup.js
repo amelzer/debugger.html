@@ -2,12 +2,16 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
+// @flow
+
+// $FlowIgnore
 global.Worker = require("workerjs");
 
 import path from "path";
-import getConfig from "../../bin/getConfig";
+// import getConfig from "../../bin/getConfig";
 import { readFileSync } from "fs";
 import Enzyme from "enzyme";
+// $FlowIgnore
 import Adapter from "enzyme-adapter-react-16";
 import { setupHelper } from "../utils/dbg";
 import { prefs } from "../utils/prefs";
@@ -19,12 +23,7 @@ import {
   stop as stopPrettyPrintWorker
 } from "../workers/pretty-print";
 
-import {
-  start as startParserWorker,
-  stop as stopParserWorker,
-  clearSymbols,
-  clearASTs
-} from "../workers/parser";
+import { ParserDispatcher } from "../workers/parser";
 import {
   start as startSearchWorker,
   stop as stopSearchWorker
@@ -37,11 +36,19 @@ env.testing = true;
 
 const rootPath = path.join(__dirname, "../../");
 
-global.DebuggerConfig = getConfig();
+function getL10nBundle() {
+  const read = file => readFileSync(path.join(rootPath, file));
+
+  try {
+    return read("./assets/panel/debugger.properties");
+  } catch (e) {
+    return read("../locales/en-US/debugger.properties");
+  }
+}
+
+global.DebuggerConfig = {};
 global.L10N = require("devtools-launchpad").L10N;
-global.L10N.setBundle(
-  readFileSync(path.join(__dirname, "../../assets/panel/debugger.properties"))
-);
+global.L10N.setBundle(getL10nBundle());
 global.jasmine.DEFAULT_TIMEOUT_INTERVAL = 20000;
 global.performance = { now: () => 0 };
 
@@ -56,14 +63,17 @@ function formatException(reason, p) {
   console && console.log("Unhandled Rejection at:", p, "reason:", reason);
 }
 
+export const parserWorker = new ParserDispatcher();
+
 beforeAll(() => {
   startSourceMapWorker(
-    path.join(rootPath, "node_modules/devtools-source-map/src/worker.js")
+    path.join(rootPath, "node_modules/devtools-source-map/src/worker.js"),
+    ""
   );
   startPrettyPrintWorker(
     path.join(rootPath, "src/workers/pretty-print/worker.js")
   );
-  startParserWorker(path.join(rootPath, "src/workers/parser/worker.js"));
+  parserWorker.start(path.join(rootPath, "src/workers/parser/worker.js"));
   startSearchWorker(path.join(rootPath, "src/workers/search/worker.js"));
   process.on("unhandledRejection", formatException);
 });
@@ -71,7 +81,7 @@ beforeAll(() => {
 afterAll(() => {
   stopSourceMapWorker();
   stopPrettyPrintWorker();
-  stopParserWorker();
+  parserWorker.stop();
   stopSearchWorker();
   process.removeListener("unhandledRejection", formatException);
 });
@@ -79,8 +89,7 @@ afterAll(() => {
 afterEach(() => {});
 
 beforeEach(async () => {
-  clearASTs();
-  await clearSymbols();
+  parserWorker.clear();
   clearHistory();
   clearDocuments();
   prefs.projectDirectoryRoot = "";
@@ -97,5 +106,25 @@ function mockIndexeddDB() {
     setItem: async (key, value) => {
       store[key] = value;
     }
+  };
+}
+
+// NOTE: We polyfill finally because TRY uses node 8
+if (!global.Promise.prototype.finally) {
+  global.Promise.prototype.finally = function finallyPolyfill(callback) {
+    const constructor = this.constructor;
+
+    return this.then(
+      function(value) {
+        return constructor.resolve(callback()).then(function() {
+          return value;
+        });
+      },
+      function(reason) {
+        return constructor.resolve(callback()).then(function() {
+          throw reason;
+        });
+      }
+    );
   };
 }

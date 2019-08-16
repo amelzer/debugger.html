@@ -2,8 +2,11 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
+// @flow
+
 import { getSymbols } from "../getSymbols";
-import { setSource } from "../sources";
+
+import type { SourceId } from "../../../types";
 
 function formatLocation(loc) {
   if (!loc) {
@@ -31,28 +34,36 @@ function summarize(symbol) {
   const name = symbol.name == undefined ? "" : symbol.name;
   const names = symbol.specifiers ? symbol.specifiers.join(", ") : "";
   const values = symbol.values ? symbol.values.join(", ") : "";
+  const index = symbol.index ? symbol.index : "";
 
-  return `${loc} ${expression} ${name}${params} ${klass} ${names} ${values}`.trim(); // eslint-disable-line max-len
+  return `${loc} ${expression} ${name}${params} ${klass} ${names} ${values} ${index}`.trim(); // eslint-disable-line max-len
 }
 const bools = ["hasJsx", "hasTypes", "loading"];
+const strings = ["framework"];
 function formatBool(name, symbols) {
   return `${name}: ${symbols[name] ? "true" : "false"}`;
 }
 
-function formatKey(name, symbols) {
+function formatString(name, symbols) {
+  return `${name}: ${symbols[name]}`;
+}
+
+function formatKey(name: string, symbols: any) {
   if (bools.includes(name)) {
     return formatBool(name, symbols);
+  }
+
+  if (strings.includes(name)) {
+    return formatString(name, symbols);
   }
 
   return `${name}:\n${symbols[name].map(summarize).join("\n")}`;
 }
 
-export function formatSymbols(source: Source) {
-  setSource(source);
-  const symbols = getSymbols(source.id);
+export function formatSymbols(sourceId: SourceId) {
+  const symbols = getSymbols(sourceId);
 
   return Object.keys(symbols)
-
     .map(name => formatKey(name, symbols))
     .join("\n\n");
 }

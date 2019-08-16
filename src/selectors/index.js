@@ -7,6 +7,7 @@
 export * from "../reducers/expressions";
 export * from "../reducers/sources";
 export * from "../reducers/tabs";
+export * from "../reducers/event-listeners";
 export * from "../reducers/pause";
 export * from "../reducers/debuggee";
 export * from "../reducers/breakpoints";
@@ -14,11 +15,16 @@ export * from "../reducers/pending-breakpoints";
 export * from "../reducers/ui";
 export * from "../reducers/file-search";
 export * from "../reducers/ast";
-export * from "../reducers/coverage";
 export * from "../reducers/project-text-search";
 export * from "../reducers/source-tree";
 
-export { getEventListeners } from "../reducers/event-listeners";
+export {
+  getSourceActor,
+  hasSourceActor,
+  getSourceActors,
+  getSourceActorsForThread
+} from "../reducers/source-actors";
+
 export {
   getQuickOpenEnabled,
   getQuickOpenQuery,
@@ -29,14 +35,23 @@ export {
   getBreakpointAtLocation,
   getBreakpointsAtLine
 } from "./breakpointAtLocation";
-export { getVisibleBreakpoints } from "./visibleBreakpoints";
+export {
+  getVisibleBreakpoints,
+  getFirstVisibleBreakpoints
+} from "./visibleBreakpoints";
 export { inComponent } from "./inComponent";
 export { isSelectedFrameVisible } from "./isSelectedFrameVisible";
 export { getCallStackFrames } from "./getCallStackFrames";
-export { getVisibleSelectedFrame } from "./visibleSelectedFrame";
 export { getBreakpointSources } from "./breakpointSources";
 export { getXHRBreakpoints, shouldPauseOnAnyXHR } from "./breakpoints";
+export * from "./visibleColumnBreakpoints";
+export {
+  getSelectedFrame,
+  getSelectedFrames,
+  getVisibleSelectedFrame
+} from "./pause";
 
+// eslint-disable-next-line import/named
 import { objectInspector } from "devtools-reps";
 
 const { reducer } = objectInspector;

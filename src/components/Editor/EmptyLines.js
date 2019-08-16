@@ -2,23 +2,21 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
-import { connect } from "react-redux";
-import { Component } from "react";
-import { getSelectedSource, getEmptyLines } from "../../selectors";
-import type { Source } from "../../types";
-import { toEditorLine } from "../../utils/editor";
+// @flow
 
-type props = {
+import { connect } from "../../utils/connect";
+import { Component } from "react";
+import { getSelectedSource, getSelectedBreakableLines } from "../../selectors";
+import type { Source } from "../../types";
+import { fromEditorLine } from "../../utils/editor";
+
+type Props = {
   selectedSource: Source,
   editor: Object,
-  emptyLines: Object
+  breakableLines: Set<number>
 };
 
-class EmptyLines extends Component {
-  props: props;
-
-  disableEmptyLines: Function;
-
+class EmptyLines extends Component<Props> {
   componentDidMount() {
     this.disableEmptyLines();
   }
@@ -28,30 +26,30 @@ class EmptyLines extends Component {
   }
 
   componentWillUnmount() {
-    const { emptyLines, selectedSource, editor } = this.props;
-
-    if (!emptyLines) {
-      return;
-    }
+    const { editor } = this.props;
 
     editor.codeMirror.operation(() => {
-      emptyLines.forEach(emptyLine => {
-        const line = toEditorLine(selectedSource.id, emptyLine);
-        editor.codeMirror.removeLineClass(line, "line", "empty-line");
+      editor.codeMirror.eachLine(lineHandle => {
+        editor.codeMirror.removeLineClass(lineHandle, "line", "empty-line");
       });
     });
   }
 
   disableEmptyLines() {
-    const { emptyLines, selectedSource, editor } = this.props;
+    const { breakableLines, selectedSource, editor } = this.props;
 
-    if (!emptyLines) {
-      return;
-    }
     editor.codeMirror.operation(() => {
-      emptyLines.forEach(emptyLine => {
-        const line = toEditorLine(selectedSource.id, emptyLine);
-        editor.codeMirror.addLineClass(line, "line", "empty-line");
+      editor.codeMirror.eachLine(lineHandle => {
+        const line = fromEditorLine(
+          selectedSource.id,
+          editor.codeMirror.getLineNumber(lineHandle)
+        );
+
+        if (breakableLines.has(line)) {
+          editor.codeMirror.removeLineClass(lineHandle, "line", "empty-line");
+        } else {
+          editor.codeMirror.addLineClass(lineHandle, "line", "empty-line");
+        }
       });
     });
   }
@@ -63,11 +61,14 @@ class EmptyLines extends Component {
 
 const mapStateToProps = state => {
   const selectedSource = getSelectedSource(state);
-  const foundEmptyLines = getEmptyLines(state, selectedSource.id);
+  if (!selectedSource) {
+    throw new Error("no selectedSource");
+  }
+  const breakableLines = getSelectedBreakableLines(state);
 
   return {
     selectedSource,
-    emptyLines: selectedSource ? foundEmptyLines : []
+    breakableLines
   };
 };
 

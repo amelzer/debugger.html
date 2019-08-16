@@ -4,6 +4,8 @@
 
 // @flow
 
+import type { SourceContent } from "../types";
+
 /**
  * Utils for utils, by utils
  * @module utils/utils
@@ -51,4 +53,26 @@ export function endTruncateStr(str: any, size: number) {
 
 export function waitForMs(ms: number): Promise<void> {
   return new Promise(resolve => setTimeout(resolve, ms));
+}
+
+export function downloadFile(content: SourceContent, fileName: string) {
+  if (content.type !== "text") {
+    return;
+  }
+
+  const data = content.value;
+  const { body } = document;
+  if (!body) {
+    return;
+  }
+
+  const a = document.createElement("a");
+  body.appendChild(a);
+  a.className = "download-anchor";
+  a.href = window.URL.createObjectURL(
+    new Blob([data], { type: "text/javascript" })
+  );
+  a.setAttribute("download", fileName);
+  a.click();
+  body.removeChild(a);
 }

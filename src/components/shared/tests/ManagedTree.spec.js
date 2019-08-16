@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
+// @flow
+
 import React from "react";
 import { mount, shallow } from "enzyme";
 
@@ -40,7 +42,7 @@ function getTestContent() {
       return item.value;
     }
     if (i) {
-      return i;
+      return `${i}`;
     }
     return `${item}-$`;
   };
@@ -84,14 +86,7 @@ describe("ManagedTree", () => {
     });
     expect(wrapper).toMatchSnapshot();
   });
-  it("focuses list items", () => {
-    const { props, testTree } = getTestContent();
-    const wrapper = shallow(<ManagedTree {...props} />);
-    wrapper.setProps({ focused: testTree.a });
-    expect(wrapper).toMatchSnapshot();
-    expect(wrapper.state().focusedItem).toEqual(testTree.a);
-    expect(props.onFocus).toHaveBeenCalledWith(testTree.a);
-  });
+
   it("sets expanded items", () => {
     const { props, testTree } = getTestContent();
     const wrapper = mount(<ManagedTree {...props} />);

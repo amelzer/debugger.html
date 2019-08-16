@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
+// @flow
+
 import {
   isWasm,
   lineToWasmOffset,
@@ -9,6 +11,8 @@ import {
   clearWasmStates,
   renderWasmText
 } from "../wasm.js";
+
+import { makeMockWasmSourceWithContent } from "../test-mockup";
 
 describe("wasm", () => {
   // Compiled version of `(module (func (nop)))`
@@ -33,19 +37,19 @@ describe("wasm", () => {
       expect(isWasm(sourceId)).toEqual(false);
     });
     it("should give us the true when wasm text was registered", () => {
-      const sourceId = "source.1";
-      renderWasmText(sourceId, SIMPLE_WASM);
-      expect(isWasm(sourceId)).toEqual(true);
+      const { source, content } = makeMockWasmSourceWithContent(SIMPLE_WASM);
+      renderWasmText(source.id, content.value);
+      expect(isWasm(source.id)).toEqual(true);
       // clear shall remove
       clearWasmStates();
-      expect(isWasm(sourceId)).toEqual(false);
+      expect(isWasm(source.id)).toEqual(false);
     });
   });
 
   describe("renderWasmText", () => {
     it("render simple wasm", () => {
-      const sourceId = "source.2";
-      const lines = renderWasmText(sourceId, SIMPLE_WASM);
+      const { source, content } = makeMockWasmSourceWithContent(SIMPLE_WASM);
+      const lines = renderWasmText(source.id, content.value);
       expect(lines.join("\n")).toEqual(SIMPLE_WASM_TEXT);
       clearWasmStates();
     });
@@ -56,9 +60,9 @@ describe("wasm", () => {
     expect(SIMPLE_WASM.binary[SIMPLE_WASM_NOP_OFFSET]).toEqual("\x01");
 
     it("get simple wasm nop offset", () => {
-      const sourceId = "source.3";
-      renderWasmText(sourceId, SIMPLE_WASM);
-      const offset = lineToWasmOffset(sourceId, SIMPLE_WASM_NOP_TEXT_LINE);
+      const { source, content } = makeMockWasmSourceWithContent(SIMPLE_WASM);
+      renderWasmText(source.id, content.value);
+      const offset = lineToWasmOffset(source.id, SIMPLE_WASM_NOP_TEXT_LINE);
       expect(offset).toEqual(SIMPLE_WASM_NOP_OFFSET);
       clearWasmStates();
     });
@@ -66,9 +70,9 @@ describe("wasm", () => {
 
   describe("wasmOffsetToLine", () => {
     it("get simple wasm nop line", () => {
-      const sourceId = "source.4";
-      renderWasmText(sourceId, SIMPLE_WASM);
-      const line = wasmOffsetToLine(sourceId, SIMPLE_WASM_NOP_OFFSET);
+      const { source, content } = makeMockWasmSourceWithContent(SIMPLE_WASM);
+      renderWasmText(source.id, content.value);
+      const line = wasmOffsetToLine(source.id, SIMPLE_WASM_NOP_OFFSET);
       expect(line).toEqual(SIMPLE_WASM_NOP_TEXT_LINE);
       clearWasmStates();
     });

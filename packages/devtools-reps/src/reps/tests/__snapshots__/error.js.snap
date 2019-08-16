@@ -1,13 +1,54 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`Error - Error with V8-like stack renders with expected text 1`] = `
+<span
+  className="objectBox-stackTrace"
+  data-link-actor-id="server1.conn1.child1/obj1020"
+>
+  Error: "BOOM"
+  <span
+    className="objectBox-stackTrace-grid"
+    key="stack"
+  >
+    	
+    <span
+      className="objectBox-stackTrace-fn"
+      key="fn0"
+    >
+      getAccount
+    </span>
+     
+    <span
+      className="objectBox-stackTrace-location"
+      key="location0"
+    >
+      http://moz.com/script.js:1:2
+    </span>
+    
+
+  </span>
+</span>
+`;
+
+exports[`Error - Error with invalid stack renders with expected text 1`] = `
+<span
+  className="objectBox-stackTrace"
+  data-link-actor-id="server1.conn1.child1/obj1020"
+>
+  Error: "bad stack"
+  <span
+    className="objectBox-stackTrace-grid"
+    key="stack"
+  />
+</span>
+`;
+
 exports[`Error - Eval error renders with expected text for an EvalError 1`] = `
 <span
   className="objectBox-stackTrace"
   data-link-actor-id="server1.conn1.child1/obj1022"
 >
   EvalError: "EvalError message"
-  
-
   <span
     className="objectBox-stackTrace-grid"
     key="stack"
@@ -38,8 +79,6 @@ exports[`Error - Internal error renders with expected text for an InternalError 
   data-link-actor-id="server1.conn1.child1/obj1023"
 >
   InternalError: "InternalError message"
-  
-
   <span
     className="objectBox-stackTrace-grid"
     key="stack"
@@ -70,8 +109,6 @@ exports[`Error - Multi line stack error renders with expected text for Error obj
   data-link-actor-id="server1.conn1.child1/obj1021"
 >
   Error: "bar"
-  
-
   <span
     className="objectBox-stackTrace-grid"
     key="stack"
@@ -134,8 +171,6 @@ exports[`Error - Range error renders with expected text for RangeError 1`] = `
   data-link-actor-id="server1.conn1.child1/obj1024"
 >
   RangeError: "RangeError message"
-  
-
   <span
     className="objectBox-stackTrace-grid"
     key="stack"
@@ -166,8 +201,6 @@ exports[`Error - Reference error renders with expected text for ReferenceError 1
   data-link-actor-id="server1.conn1.child1/obj1025"
 >
   ReferenceError: "ReferenceError message"
-  
-
   <span
     className="objectBox-stackTrace-grid"
     key="stack"
@@ -198,8 +231,6 @@ exports[`Error - Simple error renders with expected text for simple error 1`] = 
   data-link-actor-id="server1.conn1.child1/obj1020"
 >
   Error: "Error message"
-  
-
   <span
     className="objectBox-stackTrace-grid"
     key="stack"
@@ -230,8 +261,6 @@ exports[`Error - Syntax error renders with expected text for SyntaxError 1`] = `
   data-link-actor-id="server1.conn1.child1/obj1026"
 >
   SyntaxError: "SyntaxError message"
-  
-
   <span
     className="objectBox-stackTrace-grid"
     key="stack"
@@ -262,8 +291,6 @@ exports[`Error - Type error renders with expected text for TypeError 1`] = `
   data-link-actor-id="server1.conn1.child1/obj1027"
 >
   TypeError: "TypeError message"
-  
-
   <span
     className="objectBox-stackTrace-grid"
     key="stack"
@@ -294,8 +321,6 @@ exports[`Error - URI error renders with expected text for URIError 1`] = `
   data-link-actor-id="server1.conn1.child1/obj1028"
 >
   URIError: "URIError message"
-  
-
   <span
     className="objectBox-stackTrace-grid"
     key="stack"
@@ -335,8 +360,6 @@ exports[`Error - base-loader.js renders as expected without mode 1`] = `
   data-link-actor-id="server1.conn1.child1/obj1020"
 >
   Error: "Error message"
-  
-
   <span
     className="objectBox-stackTrace-grid"
     key="stack"
@@ -415,8 +438,6 @@ exports[`Error - longString stacktrace - cut-off location renders as expected 1`
   data-link-actor-id="server1.conn1.child1/obj33"
 >
   InternalError: "too much recursion"
-  
-
   <span
     className="objectBox-stackTrace-grid"
     key="stack"
@@ -543,8 +564,6 @@ exports[`Error - longString stacktrace renders as expected 1`] = `
   data-link-actor-id="server1.conn2.child1/obj33"
 >
   Error: ""
-  
-
   <span
     className="objectBox-stackTrace-grid"
     key="stack"
@@ -719,8 +738,6 @@ exports[`Error - renderStacktrace prop uses renderStacktrace prop when provided 
   data-link-actor-id="server1.conn1.child1/obj1021"
 >
   Error: "bar"
-  
-
   <li
     className="frame"
   >
@@ -748,8 +765,6 @@ exports[`Error - renderStacktrace prop uses renderStacktrace with longString err
   data-link-actor-id="server1.conn1.child1/obj33"
 >
   InternalError: "too much recursion"
-  
-
   <li
     className="frame"
   >

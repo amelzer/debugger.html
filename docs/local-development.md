@@ -1,30 +1,29 @@
 ## Development Guide␊
 
-* [Themes](#themes)
-* [Internationalization](#internationalization)
-  * [L10N](#l10n)
-  * [RTL](#rtl)
-* [Prefs](#prefs)
-  * [Creating a new Feature Flag](#creating-a-new-feature-flag)
-* [SVGs](#svgs)
-* [ContextMenus](#context-menus)
-* [Flow](#flow)
-* [Logging](#logging)
-* [Testing](#testing)
-  * [Unit Tests](#unit-tests)
-* [Linting](#linting)
-  * [Lint JS](#lint-js)
-  * [Lint CSS](#lint-css)
-* [Performance](#performance)
-* [Colors](#colors)
-* [Configs](#configs)
-* [Workers](#workers)
-  * [Adding a Task](#adding-a-task)
-* [Telemetry](#telemetry)
-* [Hot Reloading](#hot-reloading-fire)
-* [Contributing to other packages](#contributing-to-other-packages)
-* [Errors](#errors)
-* [Getting Help](#getting-help)
+- [Themes](#themes)
+- [Internationalization](#internationalization)
+  - [L10N](#l10n)
+  - [RTL](#rtl)
+- [Prefs](#prefs)
+  - [Creating a new Feature Flag](#creating-a-new-feature-flag)
+- [SVGs](#svgs)
+- [ContextMenus](#context-menus)
+- [Flow](#flow)
+- [Logging](#logging)
+- [Testing](#testing)
+  - [Unit Tests](#unit-tests)
+- [Linting](#linting)
+  - [Lint JS](#lint-js)
+  - [Lint CSS](#lint-css)
+- [Performance](#performance)
+- [Colors](#colors)
+- [Configs](#configs)
+- [Workers](#workers)
+  - [Adding a Task](#adding-a-task)
+- [Telemetry](#telemetry)
+- [Contributing to other packages](#contributing-to-other-packages)
+- [Errors](#errors)
+- [Getting Help](#getting-help)
 
 ### Themes
 
@@ -48,9 +47,15 @@ It is possible to add a theme specific selector. For example, this selector upda
 }
 ```
 
+#### Theme colors
+
+We use variable theme colors to standardize the colors inside of devtools. A good way to find a color is to select another component with the inspector and see what color it uses. The colors can be found [here][colors].
+
+[colors]: https://design.firefox.com/photon/visuals/color.html
+
 ### Internationalization
 
-The Debugger supports two types of internationalization RTL (right to left) layout and L10N (localization).
+The Debugger supports two types of internationalization: localization (L10N), and right-to-left layout (RTL).
 
 #### L10N
 
@@ -75,17 +80,11 @@ Set the `dir` field in the Launchpad's settings pane.
 
 _How do I change how something looks in rtl?_
 
-We use [postcss-bidirection][bidirection] to support [logical CSS][logical] properties. In practice, this means we can write `float:left` or `margin-inline-block: start`, and it just works. Under the hood, `float: left` gets translated into two different CSS rules for `html[dir="rtl"]` and `html:not([dir="rtl"])`.
-
-`public/js/components/SourceFooter.css`
+We use [logical CSS][logical] properties. For instance, if you need to add some padding-left in left-to-right layout and padding-right in right-to-left layout:
 
 ```css
-html:not([dir="rtl"]) .source-footer .command-bar {
-  float: right;
-}
-
-html[dir="rtl"] .source-footer .command-bar {
-  float: left;
+.my-component {
+  padding-inline-start: 10px;
 }
 ```
 
@@ -95,8 +94,8 @@ User preferences are stored in Prefs. Prefs uses localStorage locally and firefo
 
 The two relevant files to look at are:
 
-* `[assets/panel/prefs.js](https://github.com/devtools-html/debugger.html/blob/master/assets/panel/prefs.js)`
-* `[src/utils/prefs.js](https://github.com/devtools-html/debugger.html/blob/master/src/utils/prefs.js)`
+- `[assets/panel/prefs.js](https://github.com/firefox-devtools/debugger/blob/master/assets/panel/prefs.js)`
+- `[src/utils/prefs.js](https://github.com/firefox-devtools/debugger/blob/master/src/utils/prefs.js)`
 
 **Setting a default value**
 
@@ -130,9 +129,9 @@ prefs.clientSourceMapsEnabled = false;
 
 When you're starting a new feature, it's always good to ask yourself if the feature should be added behind a feature flag.
 
-* does this feature need testing or introduce risk?
-* will this feature be built over several PRs?
-* is it possible we'll want to turn it off quickly?
+- does this feature need testing or introduce risk?
+- will this feature be built over several PRs?
+- is it possible we'll want to turn it off quickly?
 
 It's easy to add a new feature flag to the project.
 
@@ -190,76 +189,47 @@ index a390df2..c610c1a 100644
 
 We use SVGs in DevTools because they look good at any resolution.
 
-**Adding a new SVG**
+To achieve sharp results on low resolutions, we make sure that our SVG icons are defined as 16-by-16 squares, with most paths and shapes following this pixel grid. See the [Photon Iconography guide](https://design.firefox.com/photon/visuals/iconography.html) for details.
 
-* add the SVG in [assets/images](../assets/images)
-* add it to [Svg.js](../assets/images/Svg.js)
+#### Adding a new SVG
 
-```diff
-diff --git a/assets/images/Svg.js b/assets/images/Svg.js
-index 775aecf..6a7c19d 100644
---- a/assets/images/Svg.js
-+++ b/assets/images/Svg.js
-@@ -24,7 +24,8 @@ const svg = {
-   "subSettings": require("./subSettings.svg"),
-   "toggleBreakpoints": require("./toggle-breakpoints.svg"),
-   "worker": require("./worker.svg"),
--  "sad-face": require("./sad-face.svg")
-+  "sad-face": require("./sad-face.svg"),
-+  "happy-face": require("./happy-face.svg")
- };
+1. Your SVG file should start with a licensing comment:
+
+```xml
+<!-- This Source Code Form is subject to the terms of the Mozilla Public
+   - License, v. 2.0. If a copy of the MPL was not distributed with this
+   - file, You can obtain one at http://mozilla.org/MPL/2.0/. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 16 16" width="16" height="16">
+  <!-- SVG paths and shapes go here -->
+</svg>
 ```
 
-**Using an SVG**
+2. Optimize your paths and shapes using [svgo](https://github.com/svg/svgo) or [SVGOMG](https://jakearchibald.github.io/svgomg/).
+3. Add your SVG file the [`/images`](../images) folder.
 
-* import the `Svg` module
-* call `Svg(<your-svg>)`
+#### Using SVGs
 
-```diff
-diff --git a/src/components/Breakpoints.js b/src/components/Breakpoints.js
-index 8c79f4d..6893673 100644
---- a/src/components/Breakpoints.js
-+++ b/src/components/Breakpoints.js
-@@ -4,6 +4,7 @@ const { bindActionCreators } = require("redux");
- const ImPropTypes = require("react-immutable-proptypes");
- const classnames = require("classnames");
- const actions = require("../actions");
-+const Svg = require("./shared/Svg");
- const { getSource, getPause, getBreakpoints } = require("../selectors");
- const { makeLocationId } = require("../reducers/breakpoints");
-@@ -89,6 +90,7 @@ const Breakpoints = React.createClass({
-         key: locationId,
-         onClick: () => this.selectBreakpoint(breakpoint)
-       },
-+      Svg("happy-face"),
-       dom.input({
-         type: "checkbox",
-         className: "breakpoint-checkbox",
+1. Import the `AccessibleImage` component
+2. Use it in JSX as: `<AccessibleImage className="my-icon" />`
+3. Add a CSS rule in [`AccessibleImage.css`](../src/components/shared/AccessibleImage.css) that defines your icon as a mask, for example:
+
+```css
+.img.my-icon {
+  mask-image: url(/images/my-icon.svg);
+}
 ```
 
-**Styling an SVG element**
+#### Styling an SVG element
 
-You can style several SVG elements (_svg_, _i_, _path_) just as you would other elements.
+By default, with `AccessibleImage` you will get a `<span class="img my-icon"></span>` element with a gray `background-color` and your SVG icon applied as a mask. You can set a different background color in CSS to change the icon's color.
 
-* _fill_ is especially useful for changing the color
+For multicolor icons, you will need to use `background-image` and reset the background color:
 
-```diff
-diff --git a/src/components/Breakpoints.css b/src/components/Breakpoints.css
-index 5996700..bb828d8 100644
---- a/src/components/Breakpoints.css
-+++ b/src/components/Breakpoints.css
-@@ -69,3 +69,11 @@
- .breakpoint:hover .close {
-   display: block;
- }
-+
-+.breakpoint svg {
-+  width: 16px;
-+  position: absolute;
-+  top: 12px;
-+  left: 10px;
-+  fill: var(--theme-graphs-full-red);
-+}
+```css
+.img.my-multicolor-icon {
+  background-image: url(/images/my-multicolor-icon.svg);
+  background-color: transparent !important;
+}
 ```
 
 ### Context Menus
@@ -290,12 +260,12 @@ function onClick(event) {
 
 Notes:
 
-* `id` helps screen readers and accessibility
-* `label` menu item label shown
-* `accesskey` keyboard shortcut used
-* `disabled` inert item
-* `click` on click callback
-* `hidden` dynamically hide items
+- `id` helps screen readers and accessibility
+- `label` menu item label shown
+- `accesskey` keyboard shortcut used
+- `disabled` inert item
+- `click` on click callback
+- `hidden` dynamically hide items
 
 #### Access Keys
 
@@ -338,15 +308,15 @@ function onClick(event) {
 
 ### [Flow](flow.md)
 
-* [Adding flow to a file](flow.md#adding-flow-to-a-file)
-* [Running flow](flow.md#running-flow)
-* [Missing Annotation](flow.md#missing-annotation)
-* [Where are types defined?](flow.md#where-are-types-defined)
-* [Checking flow coverage](flow.md#checking-flow-coverage)
-* [Common Errors](flow.md#common-errors)
-  * [Required property](flow.md#required-property)
-  * [Missing Annotation](flow.md#missing-annotation)
-  * [Type Inconsistencies](flow.md#type-inconsistencies)
+- [Adding flow to a file](flow.md#adding-flow-to-a-file)
+- [Running flow](flow.md#running-flow)
+- [Missing Annotation](flow.md#missing-annotation)
+- [Where are types defined?](flow.md#where-are-types-defined)
+- [Checking flow coverage](flow.md#checking-flow-coverage)
+- [Common Errors](flow.md#common-errors)
+  - [Required property](flow.md#required-property)
+  - [Missing Annotation](flow.md#missing-annotation)
+  - [Type Inconsistencies](flow.md#type-inconsistencies)
 
 ### Reducers
 
@@ -453,8 +423,8 @@ Logging information can be very useful when developing, and there are a few logg
 
 To enable logging:
 
-* [Create a local config file][create-local-config] if you don't already have one
-* Edit your local config, changing the value of the logger type you want to see to `true`
+- [Create a local config file][create-local-config] if you don't already have one
+- Edit your local config, changing the value of the logger type you want to see to `true`
 
 ```json
   "logging": {
@@ -464,15 +434,15 @@ To enable logging:
   }
 ```
 
-* Restart your development server by typing <kbd>ctrl</kbd>+<kbd>c</kbd> in the Terminal and run `yarn start` again
+- Restart your development server by typing <kbd>ctrl</kbd>+<kbd>c</kbd> in the Terminal and run `yarn start` again
 
 Let's cover the logging types.
 
-* client - This option is currently unused.
+- client - This option is currently unused.
 
-* firefoxProxy - This logger outputs a verbose output of all the Firefox protocol packets to your shell.
+- firefoxProxy - This logger outputs a verbose output of all the Firefox protocol packets to your shell.
 
-* actions - This logger outputs the Redux actions fired to the browser console.
+- actions - This logger outputs the Redux actions fired to the browser console.
 
 ### Testing
 
@@ -486,24 +456,9 @@ yarn run test:all
 
 #### Unit Tests
 
-`yarn test` - Run tests with [jest].
-
-* [matchers][jest-matchers]
-* [mock functions][jest-mock]
-
-Running all the tests tends to be really slow. Most of the time it is really useful to run a single test. You can do this by invoking jest directly like this:
-
-```bash
-node_modules/jest/bin/jest.js -o
-```
-
-This will run all the tests that have not been committed. Basically, all the files that are returned by the `git status` command.
-
-If the snapshot changes then update it with:
-
-```bash
-node_modules/jest/bin/jest.js -o -u
-```
+- `yarn test` or `jest` - runs the jest unit tests
+- `jest -u` - will update the jest fixtures
+- `jest --watch` - will run the tests every time a file changes
 
 ##### Testing Components
 
@@ -580,12 +535,13 @@ index a3b2ba6..cd5a8e7 100644
 
 ### Linting
 
-| Type     | Command             |
-| -------- | ------------------- |
-| all      | `yarn run lint`     |
-| css      | `yarn run lint:css` |
-| js       | `yarn run lint:js`  |
-| markdown | `yarn run lint:md`  |
+| Type     | Command                  |
+| -------- | ------------------------ |
+| all      | `yarn run lint`          |
+| css      | `yarn run lint:css`      |
+| js       | `yarn run lint:js`       |
+| markdown | `yarn run lint:md`       |
+| a11y     | `yarn run lint:jsx-a11y` |
 
 #### Lint CSS
 
@@ -699,8 +655,8 @@ to create new telemetry probes.
 There are two mechanisms available: Scalars, Histograms. Histograms are older, and Scalars is the
 new preferred method. However Scalars cannot do everything, so both are used.
 
-* **Scalars**: Count of an event
-* **Histograms**: Distribution of an event
+- **Scalars**: Count of an event
+- **Histograms**: Distribution of an event
 
 ```js
 const Telemetry = require("devtools-modules/src/utils/telemetry");
@@ -726,34 +682,6 @@ example of this process is found in [Bug 1429047][telemetry-bug]
 [telemetry-mc]: https://wiki.mozilla.org/Firefox/Data_Collection
 [request-template]: https://github.com/mozilla/data-review/blob/master/request.md
 [telemetry-bug]: https://bugzilla.mozilla.org/show_bug.cgi?id=1429047
-
-### Hot Reloading :fire:
-
-:construction: Hot Reloading is currently broken as we need to upgrade `react-hot-reloader` 3.0 [issue](https://github.com/devtools-html/devtools-core/issues/195)
-
-Hot Reloading watches for changes in the React Components JS and CSS and propagates those changes up to the application without changing the state of the application. You want this turned on.
-
-To enabled Hot Reloading:
-
-* [Create a local config file][create-local-config] if you don't already have one
-* edit `hotReloading`
-
-```diff
-diff --git a/configs/local.json b/configs/local.json
-index fdbdb4e..4759c14 100644
---- a/configs/local.json
-+++ b/configs/local.json
-@@ -1,6 +1,6 @@
- {
-   "theme": "light",
--  "hotReloading": false,
-+  "hotReloading": true,
-   "logging": {
-     "actions": false
-   },
-```
-
-* Restart your development server by typing <kbd>ctrl</kbd>+<kbd>c</kbd> in the Terminal and run `yarn start` again
 
 ### Contributing to other packages
 
@@ -807,11 +735,10 @@ your questions on [Slack][slack].
 | Breakpoints        | ![][breakpoints] | ![][wldcordeiro] [@wldcordeiro][@wldcordeiro] <br /> ![][jbhoosreddy] [@jbhoosreddy][@jbhoosreddy] |
 | Product & UI       |                  | ![][clarkbw] [@clarkbw][@clarkbw] <br /> ![][jasonlaster] [@jasonlaster][@jasonlaster]             |
 
-[devtools-config-readme]: https://github.com/devtools-html/devtools-core/blob/master/packages/devtools-config/README.md
-[create-local-config]: https://github.com/devtools-html/devtools-core/blob/master/packages/devtools-config/README.md#local-config
-[l10n-issues]: https://github.com/devtools-html/debugger.html/labels/localization
-[flow-issues]: https://github.com/devtools-html/debugger.html/labels/flow
-[bidirection]: https://github.com/gasolin/postcss-bidirection
+[devtools-config-readme]: https://github.com/firefox-devtools/devtools-core/blob/master/packages/devtools-config/README.md
+[create-local-config]: https://github.com/firefox-devtools/devtools-core/blob/master/packages/devtools-config/README.md#local-config
+[l10n-issues]: https://github.com/firefox-devtools/debugger/labels/localization
+[flow-issues]: https://github.com/firefox-devtools/debugger/labels/flow
 [logical]: https://developer.mozilla.org/en-US/docs/Web/CSS/CSS_Logical_Properties
 [scopes]: https://cloud.githubusercontent.com/assets/254562/22392764/019de6e6-e4cb-11e6-8445-2c4ec87cb4a6.png
 [call-stack]: https://cloud.githubusercontent.com/assets/254562/22392766/019eca70-e4cb-11e6-8b1a-e92b33a7cecb.png
@@ -832,9 +759,9 @@ your questions on [Slack][slack].
 [@jbhoosreddy]: https://github.com/jbhoosreddy
 [@arthur801031]: https://github.com/arthur801031
 [@zacqary]: https://github.com/zacqary
-[slack]: https://devtools-html-slack.herokuapp.com/
-[kill-strings]: https://github.com/devtools-html/devtools-core/issues/57
-[l10n]: https://github.com/devtools-html/devtools-core/blob/master/packages/devtools-launchpad/src/utils/L10N.js
+[slack]: https://firefox-devtools-slack.herokuapp.com/
+[kill-strings]: https://github.com/firefox-devtools/devtools-core/issues/57
+[l10n]: https://github.com/firefox-devtools/devtools-core/blob/master/packages/devtools-launchpad/src/utils/L10N.js
 [rtl-screenshot]: https://cloud.githubusercontent.com/assets/394320/19226865/ef18b0d0-8eb9-11e6-82b4-8c4da702fe91.png
 [jest]: https://facebook.github.io/jest/
 [jest-matchers]: https://facebook.github.io/jest/docs/using-matchers.html#content
@@ -843,22 +770,22 @@ your questions on [Slack][slack].
 [debugger-properties]: ../assets/panel/debugger.properties
 [development-json]: ../configs/development.json
 [mdn-colors]: https://developer.mozilla.org/en-US/docs/Tools/DevToolsColors
-[light-theme]: https://github.com/devtools-html/devtools-core/blob/master/packages/devtools-launchpad/src/lib/themes/light-theme.css#L1
-[dark-theme]: https://github.com/devtools-html/devtools-core/blob/master/packages/devtools-launchpad/src/lib/themes/dark-theme.css#L1
-[devtools-css-variables]: https://github.com/devtools-html/devtools-core/blob/master/packages/devtools-launchpad/src/lib/themes/variables.css#L1
+[light-theme]: https://github.com/firefox-devtools/devtools-core/blob/master/packages/devtools-launchpad/src/lib/themes/light-theme.css#L1
+[dark-theme]: https://github.com/firefox-devtools/devtools-core/blob/master/packages/devtools-launchpad/src/lib/themes/dark-theme.css#L1
+[devtools-css-variables]: https://github.com/firefox-devtools/devtools-core/blob/master/packages/devtools-launchpad/src/lib/themes/variables.css#L1
 [css variables]: https://developer.mozilla.org/en-US/docs/Web/CSS/Using_CSS_variables
 [light-ui-screen]: https://cloud.githubusercontent.com/assets/1755089/22209736/9b194f2a-e1ad-11e6-9de0-561dd529d5f0.png
 [pr-table]: ./pull-requests.md#screenshots
 [mochitest]: ./mochitests.md
 [mocha]: ./integration-tests.md
 [contrast-ratio-tool]: http://leaverou.github.io/contrast-ratio/#rgb%28204%2C%20209%2C%20213%29-on-rgb%28252%2C%20252%2C%20252%29
-[launchpad]: https://github.com/devtools-html/devtools-core/tree/master/packages/devtools-launchpad
-[reps]: https://github.com/devtools-html/reps
-[client adapters]: https://github.com/devtools-html/devtools-core/tree/master/packages/devtools-client-adapters
-[modules]: https://github.com/devtools-html/devtools-core/tree/master/packages/devtools-modules
-[source maps]: https://github.com/devtools-html/devtools-core/tree/master/packages/devtools-source-map
-[shimmed-context-menus]: https://github.com/devtools-html/devtools-core/blob/master/packages/devtools-launchpad/src/menu.js
-[context-menus]: https://github.com/devtools-html/devtools-core/blob/master/packages/devtools-modules/client/framework/menu.js
+[launchpad]: https://github.com/firefox-devtools/devtools-core/tree/master/packages/devtools-launchpad
+[reps]: https://github.com/firefox-devtools/reps
+[client adapters]: https://github.com/firefox-devtools/devtools-core/tree/master/packages/devtools-client-adapters
+[modules]: https://github.com/firefox-devtools/devtools-core/tree/master/packages/devtools-modules
+[source maps]: https://github.com/firefox-devtools/devtools-core/tree/master/packages/devtools-source-map
+[shimmed-context-menus]: https://github.com/firefox-devtools/devtools-core/blob/master/packages/devtools-contextmenu/menu.js
+[context-menus]: https://github.com/firefox-devtools/devtools-core/blob/master/packages/devtools-modules/src/menu/index.js
 [web-workers]: https://developer.mozilla.org/en-US/docs/Web/API/Web_Workers_API/Using_web_workers
 [l10n-docs]: https://developer.mozilla.org/en-US/docs/Mozilla/Localization/Localization_content_best_practices#Choose_good_key_IDs
 [immutable-docs]: https://facebook.github.io/immutable-js/docs/#/

@@ -4,56 +4,53 @@
 
 // @flow
 
-import { getBreakpoints } from "../reducers/breakpoints";
-import { getSelectedSource } from "../reducers/sources";
-import { isGeneratedId } from "devtools-source-map";
 import { createSelector } from "reselect";
-import memoize from "../utils/memoize";
+import { uniqBy } from "lodash";
 
-import type { BreakpointsMap } from "../reducers/types";
-import type { Source } from "../types";
+import { getBreakpointsList } from "../reducers/breakpoints";
+import { getSelectedSource } from "../reducers/sources";
 
-function getLocation(breakpoint, isGeneratedSource) {
-  return isGeneratedSource
-    ? breakpoint.generatedLocation || breakpoint.location
-    : breakpoint.location;
-}
+import { sortSelectedBreakpoints } from "../utils/breakpoint";
+import { getSelectedLocation } from "../utils/selected-location";
 
-const formatBreakpoint = memoize(function(breakpoint, selectedSource) {
-  const { condition, loading, disabled, hidden } = breakpoint;
-  const sourceId = selectedSource.id;
-  const isGeneratedSource = isGeneratedId(sourceId);
-
-  return {
-    location: getLocation(breakpoint, isGeneratedSource),
-    condition,
-    loading,
-    disabled,
-    hidden
-  };
-});
-
-function isVisible(breakpoint, selectedSource) {
-  const sourceId = selectedSource.id;
-  const isGeneratedSource = isGeneratedId(sourceId);
-
-  const location = getLocation(breakpoint, isGeneratedSource);
-  return location.sourceId === sourceId;
-}
+import type { Breakpoint, Source } from "../types";
+import type { Selector } from "../reducers/types";
 
 /*
  * Finds the breakpoints, which appear in the selected source.
-  */
-export const getVisibleBreakpoints = createSelector(
+ */
+export const getVisibleBreakpoints: Selector<?(Breakpoint[])> = createSelector(
   getSelectedSource,
-  getBreakpoints,
-  (selectedSource: Source, breakpoints: BreakpointsMap) => {
+  getBreakpointsList,
+  (selectedSource: ?Source, breakpoints: Breakpoint[]) => {
     if (!selectedSource) {
       return null;
     }
 
-    return breakpoints
-      .filter(bp => isVisible(bp, selectedSource))
-      .map(bp => formatBreakpoint(bp, selectedSource));
+    return breakpoints.filter(
+      bp =>
+        selectedSource &&
+        getSelectedLocation(bp, selectedSource).sourceId === selectedSource.id
+    );
+  }
+);
+
+/*
+ * Finds the first breakpoint per line, which appear in the selected source.
+ */
+export const getFirstVisibleBreakpoints: Selector<
+  Breakpoint[]
+> = createSelector(
+  getVisibleBreakpoints,
+  getSelectedSource,
+  (breakpoints, selectedSource) => {
+    if (!breakpoints || !selectedSource) {
+      return [];
+    }
+
+    return (uniqBy(
+      sortSelectedBreakpoints(breakpoints, selectedSource),
+      bp => getSelectedLocation(bp, selectedSource).line
+    ): any);
   }
 );

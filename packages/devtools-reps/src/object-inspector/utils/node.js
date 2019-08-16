@@ -10,6 +10,7 @@ const GripArrayRep = require("../../reps/grip-array");
 const GripMap = require("../../reps/grip-map");
 const GripMapEntryRep = require("../../reps/grip-map-entry");
 const ErrorRep = require("../../reps/error");
+const BigIntRep = require("../../reps/big-int");
 const { isLongString } = require("../../reps/string");
 
 const MAX_NUMERICAL_PROPERTIES = 100;
@@ -162,13 +163,14 @@ function nodeHasProperties(item: Node): boolean {
 
 function nodeIsPrimitive(item: Node): boolean {
   return (
-    !nodeHasChildren(item) &&
-    !nodeHasProperties(item) &&
-    !nodeIsEntries(item) &&
-    !nodeIsMapEntry(item) &&
-    !nodeHasAccessors(item) &&
-    !nodeIsBucket(item) &&
-    !nodeIsLongString(item)
+    nodeIsBigInt(item) ||
+    (!nodeHasChildren(item) &&
+      !nodeHasProperties(item) &&
+      !nodeIsEntries(item) &&
+      !nodeIsMapEntry(item) &&
+      !nodeHasAccessors(item) &&
+      !nodeIsBucket(item) &&
+      !nodeIsLongString(item))
   );
 }
 
@@ -231,13 +233,27 @@ function nodeIsLongString(item: Node): boolean {
   return isLongString(getValue(item));
 }
 
+function nodeIsBigInt(item: Node): boolean {
+  return BigIntRep.supportsObject(getValue(item));
+}
+
 function nodeHasFullText(item: Node): boolean {
   const value = getValue(item);
   return nodeIsLongString(item) && value.hasOwnProperty("fullText");
 }
 
+function nodeHasGetter(item: Node): boolean {
+  const getter = getNodeGetter(item);
+  return getter && getter.type !== "undefined";
+}
+
+function nodeHasSetter(item: Node): boolean {
+  const setter = getNodeSetter(item);
+  return setter && setter.type !== "undefined";
+}
+
 function nodeHasAccessors(item: Node): boolean {
-  return !!getNodeGetter(item) || !!getNodeSetter(item);
+  return nodeHasGetter(item) || nodeHasSetter(item);
 }
 
 function nodeSupportsNumericalBucketing(item: Node): boolean {
@@ -330,8 +346,11 @@ function makeNodesForPromiseProperties(item: Node): Array<Node> {
   return properties;
 }
 
-function makeNodesForProxyProperties(item: Node): Array<Node> {
-  const { proxyHandler, proxyTarget } = getValue(item);
+function makeNodesForProxyProperties(
+  loadedProps: GripProperties,
+  item: Node
+): Array<Node> {
+  const { proxyHandler, proxyTarget } = loadedProps;
 
   return [
     createNode({
@@ -420,36 +439,6 @@ function getNodeGetter(item: Node): ?Object {
 
 function getNodeSetter(item: Node): ?Object {
   return item && item.contents ? item.contents.set : undefined;
-}
-
-function makeNodesForAccessors(item: Node): Array<Node> {
-  const accessors = [];
-
-  const getter = getNodeGetter(item);
-  if (getter && getter.type !== "undefined") {
-    accessors.push(
-      createNode({
-        parent: item,
-        name: "<get>",
-        contents: { value: getter },
-        type: NODE_TYPES.GET
-      })
-    );
-  }
-
-  const setter = getNodeSetter(item);
-  if (setter && setter.type !== "undefined") {
-    accessors.push(
-      createNode({
-        parent: item,
-        name: "<set>",
-        contents: { value: setter },
-        type: NODE_TYPES.SET
-      })
-    );
-  }
-
-  return accessors;
 }
 
 function sortProperties(properties: Array<any>): Array<any> {
@@ -613,6 +602,18 @@ function makeNodesForProperties(
     nodes.push(makeNodesForEntries(parent));
   }
 
+  // Add accessor nodes if needed
+  for (const name of propertiesNames) {
+    const property = allProperties[name];
+    if (property.get && property.get.type !== "undefined") {
+      nodes.push(createGetterNode({ parent, property, name }));
+    }
+
+    if (property.set && property.set.type !== "undefined") {
+      nodes.push(createSetterNode({ parent, property, name }));
+    }
+  }
+
   // Add the prototype if it exists and is not null
   if (prototype && prototype.type !== "null") {
     nodes.push(makeNodeForPrototype(objProps, parent));
@@ -691,6 +692,24 @@ function createNode(options: {
   };
 }
 
+function createGetterNode({ parent, property, name }) {
+  return createNode({
+    parent,
+    name: `<get ${name}()>`,
+    contents: { value: property.get },
+    type: NODE_TYPES.GET
+  });
+}
+
+function createSetterNode({ parent, property, name }) {
+  return createNode({
+    parent,
+    name: `<set ${name}()>`,
+    contents: { value: property.set },
+    type: NODE_TYPES.SET
+  });
+}
+
 function getSymbolDescriptor(symbol: Symbol | string): string {
   return symbol.toString().replace(/^(Symbol\()(.*)(\))$/, "$2");
 }
@@ -700,12 +719,48 @@ function setNodeChildren(node: Node, children: Array<Node>): Node {
   return node;
 }
 
+function getEvaluatedItem(item: Node, evaluations: Evaluations): Node {
+  if (!evaluations.has(item.path)) {
+    return item;
+  }
+
+  return {
+    ...item,
+    contents: evaluations.get(item.path)
+  };
+}
+
+function getChildrenWithEvaluations(options: {
+  cachedNodes: CachedNodes,
+  loadedProperties: LoadedProperties,
+  item: Node,
+  evaluations: Evaluations
+}): Array<Node> {
+  const { item, loadedProperties, cachedNodes, evaluations } = options;
+
+  const children = getChildren({
+    loadedProperties,
+    cachedNodes,
+    item
+  });
+
+  if (Array.isArray(children)) {
+    return children.map(i => getEvaluatedItem(i, evaluations));
+  }
+
+  if (children) {
+    return getEvaluatedItem(children, evaluations);
+  }
+
+  return [];
+}
+
 function getChildren(options: {
   cachedNodes: CachedNodes,
   loadedProperties: LoadedProperties,
   item: Node
 }): Array<Node> {
-  const { cachedNodes, loadedProperties = new Map(), item } = options;
+  const { cachedNodes, item, loadedProperties = new Map() } = options;
 
   const key = item.path;
   if (cachedNodes && cachedNodes.has(key)) {
@@ -736,16 +791,12 @@ function getChildren(options: {
     return addToCache(item.contents);
   }
 
-  if (nodeHasAccessors(item)) {
-    return addToCache(makeNodesForAccessors(item));
-  }
-
   if (nodeIsMapEntry(item)) {
     return addToCache(makeNodesForMapEntry(item));
   }
 
-  if (nodeIsProxy(item)) {
-    return addToCache(makeNodesForProxyProperties(item));
+  if (nodeIsProxy(item) && hasLoadedProps) {
+    return addToCache(makeNodesForProxyProperties(loadedProps, item));
   }
 
   if (nodeIsLongString(item) && hasLoadedProps) {
@@ -835,13 +886,49 @@ function getClosestNonBucketNode(item: Node): Node | null {
   return getClosestNonBucketNode(parent);
 }
 
+function getParentGripNode(item: Node | null): Node | null {
+  const parentNode = getParent(item);
+  if (!parentNode) {
+    return null;
+  }
+
+  return getClosestGripNode(parentNode);
+}
+
+function getParentGripValue(item: Node | null): any {
+  const parentGripNode = getParentGripNode(item);
+  if (!parentGripNode) {
+    return null;
+  }
+
+  return getValue(parentGripNode);
+}
+
+function getNonPrototypeParentGripValue(item: Node | null): Node | null {
+  const parentGripNode = getParentGripNode(item);
+  if (!parentGripNode) {
+    return null;
+  }
+
+  if (getType(parentGripNode) === NODE_TYPES.PROTOTYPE) {
+    return getNonPrototypeParentGripValue(parentGripNode);
+  }
+
+  return getValue(parentGripNode);
+}
+
 module.exports = {
   createNode,
+  createGetterNode,
+  createSetterNode,
   getActor,
   getChildren,
+  getChildrenWithEvaluations,
   getClosestGripNode,
   getClosestNonBucketNode,
   getParent,
+  getParentGripValue,
+  getNonPrototypeParentGripValue,
   getNumericalPropertiesCount,
   getValue,
   makeNodesForEntries,
@@ -853,6 +940,8 @@ module.exports = {
   nodeHasChildren,
   nodeHasEntries,
   nodeHasProperties,
+  nodeHasGetter,
+  nodeHasSetter,
   nodeIsBlock,
   nodeIsBucket,
   nodeIsDefaultProperties,

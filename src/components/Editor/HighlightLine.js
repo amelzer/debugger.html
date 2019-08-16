@@ -6,27 +6,32 @@
 import { Component } from "react";
 import { toEditorLine, endOperation, startOperation } from "../../utils/editor";
 import { getDocument, hasDocument } from "../../utils/editor/source-documents";
-import { isLoaded } from "../../utils/source";
 
-import { connect } from "react-redux";
+import { connect } from "../../utils/connect";
 import {
   getVisibleSelectedFrame,
   getSelectedLocation,
-  getSelectedSource,
-  getPauseCommand
+  getSelectedSourceWithContent,
+  getPauseCommand,
+  getCurrentThread
 } from "../../selectors";
 
-import type { Frame, Location, Source } from "../../types";
+import type {
+  Frame,
+  SourceLocation,
+  SourceWithContent,
+  SourceDocuments
+} from "../../types";
 import type { Command } from "../../reducers/types";
 
 type Props = {
   pauseCommand: Command,
   selectedFrame: Frame,
-  selectedLocation: Location,
-  selectedSource: Source
+  selectedLocation: SourceLocation,
+  selectedSourceWithContent: ?SourceWithContent
 };
 
-function isDebugLine(selectedFrame: Frame, selectedLocation: Location) {
+function isDebugLine(selectedFrame: Frame, selectedLocation: SourceLocation) {
   if (!selectedFrame) {
     return;
   }
@@ -37,10 +42,14 @@ function isDebugLine(selectedFrame: Frame, selectedLocation: Location) {
   );
 }
 
-function isDocumentReady(selectedSource, selectedLocation) {
+function isDocumentReady(
+  selectedSourceWithContent: ?SourceWithContent,
+  selectedLocation
+) {
   return (
     selectedLocation &&
-    isLoaded(selectedSource) &&
+    selectedSourceWithContent &&
+    selectedSourceWithContent.content &&
     hasDocument(selectedLocation.sourceId)
   );
 }
@@ -50,15 +59,29 @@ export class HighlightLine extends Component<Props> {
   previousEditorLine: ?number = null;
 
   shouldComponentUpdate(nextProps: Props) {
-    const { selectedLocation, selectedSource } = nextProps;
-    return this.shouldSetHighlightLine(selectedLocation, selectedSource);
+    const { selectedLocation, selectedSourceWithContent } = nextProps;
+    return this.shouldSetHighlightLine(
+      selectedLocation,
+      selectedSourceWithContent
+    );
   }
 
-  shouldSetHighlightLine(selectedLocation: Location, selectedSource: Source) {
+  componentDidUpdate(prevProps: Props) {
+    this.completeHighlightLine(prevProps);
+  }
+
+  componentDidMount() {
+    this.completeHighlightLine(null);
+  }
+
+  shouldSetHighlightLine(
+    selectedLocation: SourceLocation,
+    selectedSourceWithContent: ?SourceWithContent
+  ) {
     const { sourceId, line } = selectedLocation;
     const editorLine = toEditorLine(sourceId, line);
 
-    if (!isDocumentReady(selectedSource, selectedLocation)) {
+    if (!isDocumentReady(selectedSourceWithContent, selectedLocation)) {
       return false;
     }
 
@@ -69,35 +92,44 @@ export class HighlightLine extends Component<Props> {
     return true;
   }
 
-  componentDidUpdate(prevProps: Props) {
+  completeHighlightLine(prevProps: Props | null) {
     const {
       pauseCommand,
       selectedLocation,
       selectedFrame,
-      selectedSource
+      selectedSourceWithContent
     } = this.props;
     if (pauseCommand) {
       this.isStepping = true;
     }
 
     startOperation();
-    this.clearHighlightLine(
-      prevProps.selectedLocation,
-      prevProps.selectedSource
+    if (prevProps) {
+      this.clearHighlightLine(
+        prevProps.selectedLocation,
+        prevProps.selectedSourceWithContent
+      );
+    }
+    this.setHighlightLine(
+      selectedLocation,
+      selectedFrame,
+      selectedSourceWithContent
     );
-    this.setHighlightLine(selectedLocation, selectedFrame, selectedSource);
     endOperation();
   }
 
   setHighlightLine(
-    selectedLocation: Location,
+    selectedLocation: SourceLocation,
     selectedFrame: Frame,
-    selectedSource: Source
+    selectedSourceWithContent: ?SourceWithContent
   ) {
     const { sourceId, line } = selectedLocation;
-    if (!this.shouldSetHighlightLine(selectedLocation, selectedSource)) {
+    if (
+      !this.shouldSetHighlightLine(selectedLocation, selectedSourceWithContent)
+    ) {
       return;
     }
+
     this.isStepping = false;
     const editorLine = toEditorLine(sourceId, line);
     this.previousEditorLine = editorLine;
@@ -108,10 +140,35 @@ export class HighlightLine extends Component<Props> {
 
     const doc = getDocument(sourceId);
     doc.addLineClass(editorLine, "line", "highlight-line");
+    this.resetHighlightLine(doc, editorLine);
   }
 
-  clearHighlightLine(selectedLocation: Location, selectedSource: Source) {
-    if (!isDocumentReady(selectedSource, selectedLocation)) {
+  resetHighlightLine(doc: SourceDocuments, editorLine: number) {
+    const editorWrapper: HTMLElement | null = document.querySelector(
+      ".editor-wrapper"
+    );
+
+    if (editorWrapper === null) {
+      return;
+    }
+
+    const style = getComputedStyle(editorWrapper);
+    const durationString = style.getPropertyValue("--highlight-line-duration");
+
+    let duration = durationString.match(/\d+/);
+    duration = duration.length ? Number(duration[0]) : 0;
+
+    setTimeout(
+      () => doc && doc.removeLineClass(editorLine, "line", "highlight-line"),
+      duration
+    );
+  }
+
+  clearHighlightLine(
+    selectedLocation: SourceLocation,
+    selectedSourceWithContent: ?SourceWithContent
+  ) {
+    if (!isDocumentReady(selectedSourceWithContent, selectedLocation)) {
       return;
     }
 
@@ -127,8 +184,8 @@ export class HighlightLine extends Component<Props> {
 }
 
 export default connect(state => ({
-  pauseCommand: getPauseCommand(state),
+  pauseCommand: getPauseCommand(state, getCurrentThread(state)),
   selectedFrame: getVisibleSelectedFrame(state),
   selectedLocation: getSelectedLocation(state),
-  selectedSource: getSelectedSource(state)
+  selectedSourceWithContent: getSelectedSourceWithContent(state)
 }))(HighlightLine);

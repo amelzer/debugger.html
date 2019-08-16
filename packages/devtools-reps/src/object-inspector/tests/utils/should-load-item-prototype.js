@@ -5,6 +5,8 @@
 const Utils = require("../../utils");
 const {
   createNode,
+  createGetterNode,
+  createSetterNode,
   getChildren,
   makeNodesForEntries,
   nodeIsDefaultProperties
@@ -150,14 +152,14 @@ describe("shouldLoadItemPrototype", () => {
     expect(shouldLoadItemPrototype(node)).toBeFalsy();
   });
 
-  it("returns true for a Proxy node", () => {
+  it("returns false for a Proxy node", () => {
     const node = createNode({
       name: "root",
       contents: {
         value: gripStubs.get("testProxy")
       }
     });
-    expect(shouldLoadItemPrototype(node)).toBeTruthy();
+    expect(shouldLoadItemPrototype(node)).toBeFalsy();
   });
 
   it("returns true for a Proxy target node", () => {
@@ -167,7 +169,10 @@ describe("shouldLoadItemPrototype", () => {
         value: gripStubs.get("testProxy")
       }
     });
-    const [targetNode] = getChildren({ item: proxyNode });
+    const loadedProperties = new Map([
+      [proxyNode.path, gripStubs.get("testProxySlots")]
+    ]);
+    const [targetNode] = getChildren({ item: proxyNode, loadedProperties });
     // Make sure we have the target node.
     expect(targetNode.name).toBe("<target>");
     expect(shouldLoadItemPrototype(targetNode)).toBeTruthy();
@@ -184,22 +189,20 @@ describe("shouldLoadItemPrototype", () => {
   });
 
   it("returns true for an accessor <get> node", () => {
-    const accessorNode = createNode({
+    const getNode = createGetterNode({
       name: "root",
-      contents: accessorStubs.get("getter")
+      property: accessorStubs.get("getter")
     });
-    const [getNode] = getChildren({ item: accessorNode });
-    expect(getNode.name).toBe("<get>");
+    expect(getNode.name).toBe("<get root()>");
     expect(shouldLoadItemPrototype(getNode)).toBeTruthy();
   });
 
   it("returns true for an accessor <set> node", () => {
-    const accessorNode = createNode({
+    const setNode = createSetterNode({
       name: "root",
-      contents: accessorStubs.get("setter")
+      property: accessorStubs.get("setter")
     });
-    const [setNode] = getChildren({ item: accessorNode });
-    expect(setNode.name).toBe("<set>");
+    expect(setNode.name).toBe("<set root()>");
     expect(shouldLoadItemPrototype(setNode)).toBeTruthy();
   });
 

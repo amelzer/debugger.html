@@ -4,6 +4,12 @@
 
 // @flow
 
+import type { SettledValue, FulfilledValue } from "./utils/async-value";
+import type { SourcePayload } from "./client/firefox/types";
+import type { SourceActorId, SourceActor } from "./reducers/source-actors";
+
+export type { SourceActorId, SourceActor };
+
 export type SearchModifiers = {
   caseSensitive: boolean,
   wholeWord: boolean,
@@ -20,6 +26,8 @@ export type Mode =
         typescript: boolean
       }
     };
+
+export type ThreadId = string;
 
 /**
  * Breakpoint ID
@@ -45,79 +53,128 @@ export type SourceId = string;
  */
 export type ActorId = string;
 
+export type QueuedSourceData =
+  | { type: "original", data: OriginalSourceData }
+  | { type: "generated", data: GeneratedSourceData };
+
+export type OriginalSourceData = {|
+  id: string,
+  url: string
+|};
+
+export type GeneratedSourceData = {
+  thread: ThreadId,
+  source: SourcePayload,
+
+  // Many of our tests rely on being able to set a specific ID for the Source
+  // object. We may want to consider avoiding that eventually.
+  id?: string
+};
+
+export type SourceActorLocation = {|
+  +sourceActor: SourceActorId,
+  +line: number,
+  +column?: number
+|};
+
 /**
  * Source File Location
  *
  * @memberof types
  * @static
  */
-export type Location = {
-  sourceId: SourceId,
-  line: number,
-  column?: number,
-  sourceUrl?: string
-};
+export type SourceLocation = {|
+  +sourceId: SourceId,
+  +line: number,
+  +column?: number,
+  +sourceUrl?: string
+|};
 
 export type MappedLocation = {
-  location: Location,
-  generatedLocation: Location
+  +location: SourceLocation,
+  +generatedLocation: SourceLocation
+};
+
+export type PartialPosition = {
+  +line: number,
+  +column?: number
 };
 
 export type Position = {
-  line: number,
-  column?: number
+  +line: number,
+  +column: number
 };
 
-export type ColumnPosition = {
-  line: number,
-  column: number
-};
-
+export type PartialRange = { end: PartialPosition, start: PartialPosition };
 export type Range = { end: Position, start: Position };
-export type ColumnRange = { end: ColumnPosition, start: ColumnPosition };
 
 export type PendingLocation = {
-  line: number,
-  column?: number,
-  sourceUrl?: string
+  +line: number,
+  +column?: number,
+  +sourceUrl?: string
+};
+
+// Type of location used when setting breakpoints in the server. Exactly one of
+// { sourceUrl, sourceId } must be specified. Soon this will replace
+// SourceLocation and PendingLocation, and SourceActorLocation will be removed
+// (bug 1524374).
+export type BreakpointLocation = {
+  +line: number,
+  +column?: number,
+  +sourceUrl?: string,
+  +sourceId?: SourceActorId
 };
 
 export type ASTLocation = {|
-  name: ?string,
-  offset: Position
+  +name: ?string,
+  +offset: PartialPosition,
+  +index: number
 |};
 
 /**
- * Breakpoint
+ * Breakpoint is associated with a Source.
  *
  * @memberof types
  * @static
  */
-export type Breakpoint = {
-  id: BreakpointId,
-  location: Location,
-  astLocation: ?ASTLocation,
-  generatedLocation: Location,
-  loading: boolean,
-  disabled: boolean,
-  hidden: boolean,
-  text: string,
-  originalText: string,
-  condition: ?string
+export type Breakpoint = {|
+  +id: BreakpointId,
+  +location: SourceLocation,
+  +astLocation: ?ASTLocation,
+  +generatedLocation: SourceLocation,
+  +disabled: boolean,
+  +text: string,
+  +originalText: string,
+  +options: BreakpointOptions
+|};
+
+/**
+ * Options for a breakpoint that can be modified by the user.
+ */
+export type BreakpointOptions = {
+  hidden?: boolean,
+  condition?: string | null,
+  logValue?: string | null,
+  logGroupId?: string | null
 };
+
+export type BreakpointActor = {|
+  +actor: ActorId,
+  +source: SourceActor
+|};
 
 /**
  * XHR Breakpoint
  * @memberof types
  * @static
  */
-export type XHRBreakpoint = {
-  path: string,
-  method: "GET" | "POST" | "DELETE" | "ANY",
-  loading: boolean,
-  disabled: boolean,
-  text: string
-};
+export type XHRBreakpoint = {|
+  +path: string,
+  +method: "GET" | "POST" | "DELETE" | "ANY",
+  +loading: boolean,
+  +disabled: boolean,
+  +text: string
+|};
 
 /**
  * Breakpoint Result is the return from an add/modify Breakpoint request
@@ -127,7 +184,7 @@ export type XHRBreakpoint = {
  */
 export type BreakpointResult = {
   id: ActorId,
-  actualLocation: Location
+  actualLocation: SourceActorLocation
 };
 
 /**
@@ -137,13 +194,12 @@ export type BreakpointResult = {
  * @static
  */
 export type PendingBreakpoint = {
-  location: PendingLocation,
-  astLocation: ASTLocation,
-  generatedLocation: PendingLocation,
-  loading: boolean,
-  disabled: boolean,
-  text: string,
-  condition: ?string
+  +location: PendingLocation,
+  +astLocation: ASTLocation,
+  +generatedLocation: PendingLocation,
+  +disabled: boolean,
+  +text: string,
+  +options: BreakpointOptions
 };
 
 /**
@@ -161,16 +217,32 @@ export type FrameId = string;
  */
 export type Frame = {
   id: FrameId,
+  thread: string,
   displayName: string,
-  location: Location,
-  generatedLocation: Location,
-  source?: Source,
+  location: SourceLocation,
+  generatedLocation: SourceLocation,
+  source: ?Source,
   scope: Scope,
   // FIXME Define this type more clearly
   this: Object,
   framework?: string,
   isOriginal?: boolean,
-  originalDisplayName?: string
+  originalDisplayName?: string,
+  library?: string
+};
+
+export type ChromeFrame = {
+  id: FrameId,
+  displayName: string,
+  scopeChain: any,
+  generatedLocation: SourceLocation,
+  location: ?SourceLocation
+};
+
+export type OriginalFrame = {
+  displayName: string,
+  location?: SourceLocation,
+  thread: string
 };
 
 /**
@@ -237,6 +309,7 @@ export type LoadedObject = {
  * @static
  */
 export type Pause = {
+  thread: string,
   frame: Frame,
   frames: Frame[],
   why: Why,
@@ -283,52 +356,45 @@ export type Grip = {
   name?: string
 };
 
+export type TextSourceContent = {|
+  type: "text",
+  value: string,
+  contentType: string | void
+|};
+export type WasmSourceContent = {|
+  type: "wasm",
+  value: {| binary: Object |}
+|};
+export type SourceContent = TextSourceContent | WasmSourceContent;
+
+export type SourceWithContent = {|
+  source: Source,
+  +content: SettledValue<SourceContent> | null
+|};
+export type SourceWithContentAndType<+Content: SourceContent> = {|
+  source: Source,
+  +content: FulfilledValue<Content>
+|};
+
 /**
- * BaseSource
+ * Source
  *
  * @memberof types
  * @static
  */
 
-type BaseSource = {|
-  +id: string,
+export type Source = {|
+  +id: SourceId,
   +url: string,
   +sourceMapURL?: string,
   +isBlackBoxed: boolean,
   +isPrettyPrinted: boolean,
-  +contentType?: string,
-  +error?: string,
-  +loadedState: "unloaded" | "loading" | "loaded",
-  +relativeUrl: string
+  +relativeUrl: string,
+  +introductionUrl: ?string,
+  +introductionType: ?string,
+  +isExtension: boolean,
+  +isWasm: boolean
 |};
-
-/**
- * JsSource
- *
- * @memberof types
- * @static
- */
-
-export type JsSource = {|
-  ...BaseSource,
-  +isWasm: false,
-  +text?: string
-|};
-
-/**
- * WasmSource
- *
- * @memberof types
- * @static
- */
-
-export type WasmSource = {|
-  ...BaseSource,
-  +isWasm: true,
-  +text?: {| binary: Object |}
-|};
-
-export type Source = JsSource | WasmSource;
 
 /**
  * Script
@@ -372,14 +438,39 @@ export type Scope = {|
     actor: ActorId,
     class: string,
     displayName: string,
-    location: Location,
+    location: SourceLocation,
     parameterNames: string[]
   },
   type: string
 |};
 
-export type Worker = {
-  actor: string,
-  type: number,
-  url: string
+export type MainThread = {
+  +actor: ThreadId,
+  +url: string,
+  +type: number,
+  +name: string
 };
+
+export type Worker = {
+  +actor: ThreadId,
+  +url: string,
+  +type: number,
+  +name: string
+};
+
+export type Thread = MainThread & Worker;
+export type ThreadList = Array<Thread>;
+export type WorkerList = Array<Worker>;
+
+export type Cancellable = {
+  cancel: () => void
+};
+
+export type EventListenerBreakpoints = string[];
+
+export type SourceDocuments = { [string]: Object };
+
+export type BreakpointPosition = MappedLocation;
+export type BreakpointPositions = { [number]: BreakpointPosition[] };
+
+export type { Context, ThreadContext } from "./utils/context";

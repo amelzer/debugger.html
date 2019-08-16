@@ -2,11 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
+// @flow
+
 import React from "react";
 import { mount, shallow } from "enzyme";
-import { List } from "immutable";
 import { ProjectSearch } from "../ProjectSearch";
 import { statusType } from "../../reducers/project-text-search";
+import { mockcx } from "../../utils/test-mockup";
 
 const hooks = { on: [], off: [] };
 const shortcuts = {
@@ -28,31 +30,56 @@ const shortcuts = {
 
 const context = { shortcuts };
 
-const testResults = List([
+const testResults = [
   {
     filepath: "testFilePath1",
+    type: "RESULT",
     matches: [
-      { match: "match1", value: "some thing match1", column: 30 },
-      { match: "match2", value: "some thing match2", column: 60 },
-      { match: "match3", value: "some thing match3", column: 90 }
+      {
+        match: "match1",
+        value: "some thing match1",
+        column: 30,
+        type: "MATCH"
+      },
+      {
+        match: "match2",
+        value: "some thing match2",
+        column: 60,
+        type: "MATCH"
+      },
+      { match: "match3", value: "some thing match3", column: 90, type: "MATCH" }
     ]
   },
   {
     filepath: "testFilePath2",
+    type: "RESULT",
     matches: [
-      { match: "match4", value: "some thing match4", column: 80 },
-      { match: "match5", value: "some thing match5", column: 40 }
+      {
+        match: "match4",
+        value: "some thing match4",
+        column: 80,
+        type: "MATCH"
+      },
+      { match: "match5", value: "some thing match5", column: 40, type: "MATCH" }
     ]
   }
-]);
+];
 
-const testMatch = { match: "match1", value: "some thing match1", column: 30 };
+const testMatch = {
+  type: "MATCH",
+  match: "match1",
+  value: "some thing match1",
+  sourceId: "some-target/source42",
+  line: 3,
+  column: 30
+};
 
 function render(overrides = {}, mounted = false) {
   const props = {
+    cx: mockcx,
     status: "DONE",
     sources: {},
-    results: List([]),
+    results: [],
     query: "foo",
     activeSearch: "project",
     closeProjectSearch: jest.fn(),
@@ -61,6 +88,7 @@ function render(overrides = {}, mounted = false) {
     updateSearchStatus: jest.fn(),
     selectSpecificLocation: jest.fn(),
     doSearchForHighlight: jest.fn(),
+    setActiveSearch: jest.fn(),
     ...overrides
   };
 
@@ -76,7 +104,7 @@ describe("ProjectSearch", () => {
   });
 
   it("renders nothing when disabled", () => {
-    const component = render({ activeSearch: null });
+    const component = render({ activeSearch: "" });
     expect(component).toMatchSnapshot();
   });
 
@@ -161,7 +189,7 @@ describe("ProjectSearch", () => {
     component
       .find("SearchInput input")
       .simulate("keydown", { key: "Enter", stopPropagation: jest.fn() });
-    expect(searchSources).toHaveBeenCalledWith("foo");
+    expect(searchSources).toHaveBeenCalledWith(mockcx, "foo");
   });
 
   it("onEnterPress shortcut no match or setExpanded", () => {
@@ -173,7 +201,7 @@ describe("ProjectSearch", () => {
       },
       true
     );
-    component.instance().focusedItem = {};
+    component.instance().state.focusedItem = null;
     shortcuts.dispatch("Enter");
     expect(selectSpecificLocation).not.toHaveBeenCalled();
   });
@@ -187,32 +215,13 @@ describe("ProjectSearch", () => {
       },
       true
     );
-    component.instance().focusedItem = { match: testMatch };
+    component.instance().state.focusedItem = { ...testMatch };
     shortcuts.dispatch("Enter");
-    expect(selectSpecificLocation).toHaveBeenCalledWith(testMatch);
-  });
-
-  it("onEnterPress shortcut setExpanded", () => {
-    const selectSpecificLocation = jest.fn();
-    const component = render(
-      {
-        results: testResults,
-        selectSpecificLocation
-      },
-      true
-    );
-    const setExpanded = jest.fn();
-    const testFile = {
-      filepath: "testFilePath1",
-      matches: [testMatch]
-    };
-    component.instance().focusedItem = {
-      setExpanded,
-      file: testFile,
-      expanded: true
-    };
-    shortcuts.dispatch("Enter");
-    expect(setExpanded).toHaveBeenCalledWith(testFile, false);
+    expect(selectSpecificLocation).toHaveBeenCalledWith(mockcx, {
+      sourceId: "some-target/source42",
+      line: 3,
+      column: 30
+    });
   });
 
   it("state.inputValue responds to prop.query changes", () => {

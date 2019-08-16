@@ -4,27 +4,31 @@
 
 // @flow
 import React, { Component } from "react";
-import classNames from "classnames";
-import Svg from "../../shared/Svg";
+import PropTypes from "prop-types";
 
+import classNames from "classnames";
+
+import AccessibleImage from "../../shared/AccessibleImage";
 import { formatDisplayName } from "../../../utils/pause/frames";
 import { getFilename, getFileURL } from "../../../utils/source";
 import FrameMenu from "./FrameMenu";
+import FrameIndent from "./FrameIndent";
+import actions from "../../../actions";
 
-import type { Frame } from "../../../types";
-import type { LocalFrame } from "./types";
+import type { Frame, ThreadContext } from "../../../types";
 
 type FrameTitleProps = {
   frame: Frame,
-  options: Object
+  options: Object,
+  l10n: Object
 };
 
-function FrameTitle({ frame, options = {} }: FrameTitleProps) {
-  const displayName = formatDisplayName(frame, options);
-  return <div className="title">{displayName}</div>;
+function FrameTitle({ frame, options = {}, l10n }: FrameTitleProps) {
+  const displayName = formatDisplayName(frame, options, l10n);
+  return <span className="title">{displayName}</span>;
 }
 
-type FrameLocationProps = { frame: LocalFrame, displayFullUrl: boolean };
+type FrameLocationProps = { frame: Frame, displayFullUrl: boolean };
 
 function FrameLocation({ frame, displayFullUrl = false }: FrameLocationProps) {
   if (!frame.source) {
@@ -33,10 +37,12 @@ function FrameLocation({ frame, displayFullUrl = false }: FrameLocationProps) {
 
   if (frame.library) {
     return (
-      <div className="location">
+      <span className="location">
         {frame.library}
-        <Svg name={frame.library.toLowerCase()} className="annotation-logo" />
-      </div>
+        <AccessibleImage
+          className={`annotation-logo ${frame.library.toLowerCase()}`}
+        />
+      </span>
     );
   }
 
@@ -45,32 +51,41 @@ function FrameLocation({ frame, displayFullUrl = false }: FrameLocationProps) {
     ? getFileURL(source, false)
     : getFilename(source);
 
-  return <div className="location">{`${filename}:${location.line}`}</div>;
+  return (
+    <span className="location">
+      <span className="filename">{filename}</span>:
+      <span className="line">{location.line}</span>
+    </span>
+  );
 }
 
 FrameLocation.displayName = "FrameLocation";
 
 type FrameComponentProps = {
-  frame: LocalFrame,
-  selectedFrame: LocalFrame,
+  cx: ThreadContext,
+  frame: Frame,
+  selectedFrame: Frame,
   copyStackTrace: Function,
   toggleFrameworkGrouping: Function,
-  selectFrame: Function,
+  selectFrame: typeof actions.selectFrame,
   frameworkGroupingOn: boolean,
   hideLocation: boolean,
   shouldMapDisplayName: boolean,
   toggleBlackBox: Function,
   displayFullUrl: boolean,
-  getFrameTitle?: string => string
+  getFrameTitle?: string => string,
+  disableContextMenu: boolean,
+  selectable: boolean
 };
 
 export default class FrameComponent extends Component<FrameComponentProps> {
   static defaultProps = {
     hideLocation: false,
-    shouldMapDisplayName: true
+    shouldMapDisplayName: true,
+    disableContextMenu: false
   };
 
-  onContextMenu(event: SyntheticKeyboardEvent<HTMLElement>) {
+  onContextMenu(event: SyntheticMouseEvent<HTMLElement>) {
     const {
       frame,
       copyStackTrace,
@@ -87,14 +102,14 @@ export default class FrameComponent extends Component<FrameComponentProps> {
   }
 
   onMouseDown(
-    e: SyntheticKeyboardEvent<HTMLElement>,
+    e: SyntheticMouseEvent<HTMLElement>,
     frame: Frame,
     selectedFrame: Frame
   ) {
-    if (e.which == 3) {
+    if (e.button !== 0) {
       return;
     }
-    this.props.selectFrame(frame);
+    this.props.selectFrame(this.props.cx, frame);
   }
 
   onKeyUp(
@@ -105,7 +120,7 @@ export default class FrameComponent extends Component<FrameComponentProps> {
     if (event.key != "Enter") {
       return;
     }
-    this.props.selectFrame(frame);
+    this.props.selectFrame(this.props.cx, frame);
   }
 
   render() {
@@ -115,12 +130,19 @@ export default class FrameComponent extends Component<FrameComponentProps> {
       hideLocation,
       shouldMapDisplayName,
       displayFullUrl,
-      getFrameTitle
+      getFrameTitle,
+      disableContextMenu,
+      selectable
     } = this.props;
+    const { l10n } = this.context;
 
     const className = classNames("frame", {
       selected: selectedFrame && selectedFrame.id === frame.id
     });
+
+    if (!frame.source) {
+      throw new Error("no frame source");
+    }
 
     const title = getFrameTitle
       ? getFrameTitle(
@@ -129,22 +151,31 @@ export default class FrameComponent extends Component<FrameComponentProps> {
       : undefined;
 
     return (
-      <li
+      <div
+        role="listitem"
         key={frame.id}
         className={className}
         onMouseDown={e => this.onMouseDown(e, frame, selectedFrame)}
         onKeyUp={e => this.onKeyUp(e, frame, selectedFrame)}
-        onContextMenu={e => this.onContextMenu(e)}
+        onContextMenu={disableContextMenu ? null : e => this.onContextMenu(e)}
         tabIndex={0}
         title={title}
       >
-        <FrameTitle frame={frame} options={{ shouldMapDisplayName }} />
+        {selectable && <FrameIndent />}
+        <FrameTitle
+          frame={frame}
+          options={{ shouldMapDisplayName }}
+          l10n={l10n}
+        />
+        {!hideLocation && <span className="clipboard-only"> </span>}
         {!hideLocation && (
           <FrameLocation frame={frame} displayFullUrl={displayFullUrl} />
         )}
-      </li>
+        {selectable && <br className="clipboard-only" />}
+      </div>
     );
   }
 }
 
 FrameComponent.displayName = "Frame";
+FrameComponent.contextTypes = { l10n: PropTypes.object };

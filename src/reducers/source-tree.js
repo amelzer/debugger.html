@@ -9,15 +9,17 @@
  * @module reducers/source-tree
  */
 
-import type { SourceTreeAction } from "../actions/types";
+import type { SourceTreeAction, FocusItem } from "../actions/types";
 
 export type SourceTreeState = {
-  expanded: Set<string> | null
+  expanded: Set<string>,
+  focusedItem: ?FocusItem
 };
 
 export function InitialState(): SourceTreeState {
   return {
-    expanded: null
+    expanded: new Set(),
+    focusedItem: null
   };
 }
 
@@ -28,6 +30,9 @@ export default function update(
   switch (action.type) {
     case "SET_EXPANDED_STATE":
       return updateExpanded(state, action);
+
+    case "SET_FOCUSED_SOURCE_ITEM":
+      return { ...state, focusedItem: action.item };
   }
 
   return state;
@@ -46,4 +51,8 @@ type OuterState = {
 
 export function getExpandedState(state: OuterState) {
   return state.sourceTree.expanded;
+}
+
+export function getFocusedSourceItem(state: OuterState): ?FocusItem {
+  return state.sourceTree.focusedItem;
 }

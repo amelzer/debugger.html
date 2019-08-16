@@ -6,7 +6,7 @@
 
 import { setupCommands, clientCommands } from "./firefox/commands";
 import { setupEvents, clientEvents } from "./firefox/events";
-import { features } from "../utils/prefs";
+import { features, prefs } from "../utils/prefs";
 import type { Grip } from "../types";
 let DebuggerClient;
 
@@ -14,7 +14,7 @@ function createObjectClient(grip: Grip) {
   return DebuggerClient.createObjectClient(grip);
 }
 
-export async function onConnect(connection: any, actions: Object): Object {
+export async function onConnect(connection: any, actions: Object) {
   const {
     tabConnection: { tabTarget, threadClient, debuggerClient }
   } = connection;
@@ -22,29 +22,29 @@ export async function onConnect(connection: any, actions: Object): Object {
   DebuggerClient = debuggerClient;
 
   if (!tabTarget || !threadClient || !debuggerClient) {
-    return { bpClients: {} };
+    return;
   }
 
   const supportsWasm =
     features.wasm && !!debuggerClient.mainRoot.traits.wasmBinarySource;
 
-  const { bpClients } = setupCommands({
+  setupCommands({
     threadClient,
     tabTarget,
     debuggerClient,
     supportsWasm
   });
 
-  if (actions) {
-    setupEvents({ threadClient, actions, supportsWasm });
-  }
+  setupEvents({ threadClient, tabTarget, actions, supportsWasm });
 
   tabTarget.on("will-navigate", actions.willNavigate);
   tabTarget.on("navigate", actions.navigated);
 
   await threadClient.reconfigure({
     observeAsmJS: true,
-    wasmBinarySource: supportsWasm
+    pauseWorkersUntilAttach: true,
+    wasmBinarySource: supportsWasm,
+    skipBreakpoints: prefs.skipPausing
   });
 
   // In Firefox, we need to initially request all of the sources. This
@@ -53,22 +53,21 @@ export async function onConnect(connection: any, actions: Object): Object {
   // the debugger (if it's paused already, or if loading the page from
   // bfcache) so explicity fire `newSource` events for all returned
   // sources.
-  const sources = await clientCommands.fetchSources();
-  const traits = tabTarget.activeTab ? tabTarget.activeTab.traits : null;
+  const sourceInfo = await clientCommands.fetchSources();
+  const traits = tabTarget.traits;
   await actions.connect(
     tabTarget.url,
+    threadClient.actor,
     traits && traits.canRewind
   );
-  await actions.newSources(sources);
+  await actions.newGeneratedSources(sourceInfo);
 
   // If the threadClient is already paused, make sure to show a
   // paused state.
   const pausedPacket = threadClient.getLastPausePacket();
   if (pausedPacket) {
-    clientEvents.paused("paused", pausedPacket);
+    clientEvents.paused(threadClient, "paused", pausedPacket);
   }
-
-  return { bpClients };
 }
 
 export { createObjectClient, clientCommands, clientEvents };

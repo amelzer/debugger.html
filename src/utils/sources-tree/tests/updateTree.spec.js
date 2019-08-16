@@ -2,18 +2,20 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
-import { createSource } from "../../../reducers/sources";
+// @flow
+
+import { makeMockSource } from "../../../utils/test-mockup";
 import { updateTree, createTree } from "../index";
 
-type RawSource = {| url: string, id: string |};
+type RawSource = {| url: string, id: string, actors?: any |};
 
 function createSourcesMap(sources: RawSource[]) {
   const sourcesMap = sources.reduce((map, source) => {
-    map[source.id] = createSource(source);
+    map[source.id] = makeMockSource(source.url, source.id);
     return map;
   }, {});
 
-  return sourcesMap;
+  return { FakeThread: sourcesMap };
 }
 
 function formatTree(tree) {
@@ -35,23 +37,32 @@ const sources = [
   }
 ];
 
+const threads = [
+  {
+    actor: "FakeThread",
+    url: "https://davidwalsh.name",
+    type: 1,
+    name: "FakeThread"
+  }
+];
+
 const debuggeeUrl = "blah";
 
 describe("calls updateTree.js", () => {
   it("adds one source", () => {
     const prevSources = createSourcesMap([sources[0]]);
-
     const { sourceTree, uncollapsedTree } = createTree({
       debuggeeUrl,
-      sources: prevSources
+      sources: prevSources,
+      threads
     });
-
     const newTree = updateTree({
       debuggeeUrl,
       prevSources,
       newSources: createSourcesMap([sources[0], sources[1]]),
       uncollapsedTree,
-      sourceTree
+      sourceTree,
+      threads
     });
 
     expect(formatTree(newTree)).toMatchSnapshot();
@@ -62,7 +73,8 @@ describe("calls updateTree.js", () => {
 
     const { sourceTree, uncollapsedTree } = createTree({
       debuggeeUrl,
-      sources: prevSources
+      sources: prevSources,
+      threads
     });
 
     const newTree = updateTree({
@@ -70,7 +82,9 @@ describe("calls updateTree.js", () => {
       prevSources,
       newSources: createSourcesMap([sources[0], sources[1], sources[2]]),
       uncollapsedTree,
-      sourceTree
+      sourceTree,
+      projectRoot: "",
+      threads
     });
 
     expect(formatTree(newTree)).toMatchSnapshot();
@@ -83,7 +97,8 @@ describe("calls updateTree.js", () => {
 
     const { sourceTree, uncollapsedTree } = createTree({
       debuggeeUrl,
-      sources: prevSources
+      sources: prevSources,
+      threads
     });
 
     const newTree = updateTree({
@@ -91,7 +106,9 @@ describe("calls updateTree.js", () => {
       prevSources,
       newSources: createSourcesMap([sources[1]]),
       uncollapsedTree,
-      sourceTree
+      sourceTree,
+      projectRoot: "",
+      threads
     });
 
     expect(formatTree(newTree)).toMatchSnapshot();

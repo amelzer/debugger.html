@@ -4,16 +4,19 @@
 
 // @flow
 import React, { Component } from "react";
-import { connect } from "react-redux";
+import { connect } from "../../utils/connect";
 import classnames from "classnames";
 import { features } from "../../utils/prefs";
+
+// eslint-disable-next-line import/named
 import { objectInspector } from "devtools-reps";
 
 import actions from "../../actions";
 import {
   getExpressions,
   getExpressionError,
-  getAutocompleteMatchset
+  getAutocompleteMatchset,
+  getThreadContext
 } from "../../selectors";
 import { getValue } from "../../utils/expressions";
 import { createObjectClient } from "../../client/firefox";
@@ -22,7 +25,7 @@ import { CloseButton } from "../shared/Button";
 import { debounce } from "lodash";
 
 import type { List } from "immutable";
-import type { Expression } from "../../types";
+import type { Expression, ThreadContext } from "../../types";
 
 import "./Expressions.css";
 
@@ -36,19 +39,23 @@ type State = {
 };
 
 type Props = {
+  cx: ThreadContext,
   expressions: List<Expression>,
   expressionError: boolean,
   showInput: boolean,
   autocompleteMatches: string[],
-  autocomplete: (input: string, cursor: number) => Promise<any>,
-  clearAutocomplete: () => void,
   onExpressionAdded: () => void,
-  addExpression: (input: string) => void,
-  clearExpressionError: () => void,
-  evaluateExpressions: () => void,
-  updateExpression: (input: string, expression: Expression) => void,
-  deleteExpression: (expression: Expression) => void,
-  openLink: (url: string) => void
+  autocomplete: typeof actions.autocomplete,
+  clearAutocomplete: typeof actions.clearAutocomplete,
+  addExpression: typeof actions.addExpression,
+  clearExpressionError: typeof actions.clearExpressionError,
+  evaluateExpressions: typeof actions.evaluateExpressions,
+  updateExpression: typeof actions.updateExpression,
+  deleteExpression: typeof actions.deleteExpression,
+  openLink: typeof actions.openLink,
+  openElementInInspector: typeof actions.openElementInInspectorCommand,
+  highlightDomElement: typeof actions.highlightDomElement,
+  unHighlightDomElement: typeof actions.unHighlightDomElement
 };
 
 class Expressions extends Component<Props, State> {
@@ -70,9 +77,16 @@ class Expressions extends Component<Props, State> {
   }
 
   componentDidMount() {
-    const { expressions, evaluateExpressions } = this.props;
+    const { cx, expressions, evaluateExpressions, showInput } = this.props;
+
     if (expressions.size > 0) {
-      evaluateExpressions();
+      evaluateExpressions(cx);
+    }
+
+    // Ensures that the input is focused when the "+"
+    // is clicked while the panel is collapsed
+    if (showInput && this._input) {
+      this._input.focus();
     }
   }
 
@@ -151,7 +165,7 @@ class Expressions extends Component<Props, State> {
 
   findAutocompleteMatches = debounce((value, selectionStart) => {
     const { autocomplete } = this.props;
-    autocomplete(value, selectionStart);
+    autocomplete(this.props.cx, value, selectionStart);
   }, 250);
 
   handleKeyDown = (e: SyntheticKeyboardEvent<HTMLInputElement>) => {
@@ -163,6 +177,7 @@ class Expressions extends Component<Props, State> {
   hideInput = () => {
     this.setState({ focused: false });
     this.props.onExpressionAdded();
+    this.props.clearExpressionError();
   };
 
   onFocus = () => {
@@ -181,7 +196,11 @@ class Expressions extends Component<Props, State> {
     e.preventDefault();
     e.stopPropagation();
 
-    this.props.updateExpression(this.state.inputValue, expression);
+    this.props.updateExpression(
+      this.props.cx,
+      this.state.inputValue,
+      expression
+    );
     this.hideInput();
   };
 
@@ -191,7 +210,7 @@ class Expressions extends Component<Props, State> {
     e.stopPropagation();
 
     this.props.clearExpressionError();
-    await this.props.addExpression(this.state.inputValue);
+    await this.props.addExpression(this.props.cx, this.state.inputValue);
     this.setState({
       editing: false,
       editIndex: -1,
@@ -206,7 +225,14 @@ class Expressions extends Component<Props, State> {
   };
 
   renderExpression = (expression: Expression, index: number) => {
-    const { expressionError, openLink } = this.props;
+    const {
+      expressionError,
+      openLink,
+      openElementInInspector,
+      highlightDomElement,
+      unHighlightDomElement
+    } = this.props;
+
     const { editing, editIndex } = this.state;
     const { input, updating } = expression;
     const isEditingExpr = editing && editIndex === index;
@@ -240,9 +266,12 @@ class Expressions extends Component<Props, State> {
             roots={[root]}
             autoExpandDepth={0}
             disableWrap={true}
-            focusable={false}
             openLink={openLink}
             createObjectClient={grip => createObjectClient(grip)}
+            onDOMNodeClick={grip => openElementInInspector(grip)}
+            onInspectIconClick={grip => openElementInInspector(grip)}
+            onDOMNodeMouseOver={grip => highlightDomElement(grip)}
+            onDOMNodeMouseOut={grip => unHighlightDomElement(grip)}
           />
           <div className="expression-container__close-btn">
             <CloseButton
@@ -273,7 +302,7 @@ class Expressions extends Component<Props, State> {
   }
 
   renderNewExpressionInput() {
-    const { expressionError, showInput } = this.props;
+    const { expressionError } = this.props;
     const { editing, inputValue, focused } = this.state;
     const error = editing === false && expressionError === true;
     const placeholder: string = error
@@ -293,7 +322,6 @@ class Expressions extends Component<Props, State> {
             onBlur={this.hideInput}
             onKeyDown={this.handleKeyDown}
             onFocus={this.onFocus}
-            autoFocus={showInput}
             value={!editing ? inputValue : ""}
             ref={c => (this._input = c)}
             {...features.autocompleteExpression && {
@@ -357,6 +385,7 @@ class Expressions extends Component<Props, State> {
 
 const mapStateToProps = state => {
   return {
+    cx: getThreadContext(state),
     autocompleteMatches: getAutocompleteMatchset(state),
     expressions: getExpressions(state),
     expressionError: getExpressionError(state)
@@ -368,12 +397,14 @@ export default connect(
   {
     autocomplete: actions.autocomplete,
     clearAutocomplete: actions.clearAutocomplete,
-    onExpressionAdded: actions.onExpressionAdded,
     addExpression: actions.addExpression,
     clearExpressionError: actions.clearExpressionError,
     evaluateExpressions: actions.evaluateExpressions,
     updateExpression: actions.updateExpression,
     deleteExpression: actions.deleteExpression,
-    openLink: actions.openLink
+    openLink: actions.openLink,
+    openElementInInspector: actions.openElementInInspectorCommand,
+    highlightDomElement: actions.highlightDomElement,
+    unHighlightDomElement: actions.unHighlightDomElement
   }
 )(Expressions);

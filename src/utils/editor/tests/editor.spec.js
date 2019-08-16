@@ -2,9 +2,10 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
+// @flow
+
 import {
   shouldShowPrettyPrint,
-  shouldShowFooter,
   traverseResults,
   toEditorLine,
   toEditorPosition,
@@ -21,51 +22,22 @@ import {
   getCursorLine
 } from "../index";
 
-function makeSource() {
-  return {
-    id: "test-id-123/originalSource",
-    url: "http://example.com/index.js",
-    sourceMapURL: "http://example.com/index.source.map",
-    isBlackBoxed: false,
-    isPrettyPrinted: false,
-    isWasm: false,
-    text: "some text here",
-    contentType: "text/javascript",
-    loadedState: "loaded"
-  };
-}
+import { makeMockSource, makeMockSourceAndContent } from "../../test-mockup";
 
 describe("shouldShowPrettyPrint", () => {
-  it("no pretty print with no source", () => {
-    expect(shouldShowPrettyPrint(null)).toEqual(false);
-  });
-
   it("shows pretty print for a source", () => {
-    const source = {
-      ...makeSource(),
-      id: "test-id-123",
-      sourceMapURL: null
-    };
-    expect(shouldShowPrettyPrint(source)).toEqual(true);
-  });
-});
-
-describe("shouldShowFooter", () => {
-  it("shows footer when not horizontal", () => {
-    expect(shouldShowFooter(makeSource(), false)).toEqual(true);
-  });
-
-  it("does not show footer when no source is selected", () => {
-    expect(shouldShowFooter(null, true)).toEqual(false);
-  });
-
-  it("shows if pretty print should show", () => {
-    expect(shouldShowFooter(makeSource(), true)).toEqual(true);
+    const { source, content } = makeMockSourceAndContent(
+      "http://example.com/index.js",
+      "test-id-123",
+      "text/javascript",
+      "some text here"
+    );
+    expect(shouldShowPrettyPrint(source, content)).toEqual(true);
   });
 });
 
 describe("traverseResults", () => {
-  const e = { stopPropagation: jest.fn(), preventDefault: jest.fn() };
+  const e: any = { stopPropagation: jest.fn(), preventDefault: jest.fn() };
   const ctx = {};
   const query = "Awesome books";
   const modifiers = {
@@ -100,7 +72,7 @@ describe("toEditorLine", () => {
 
 describe("toEditorPosition", () => {
   it("returns an editor position", () => {
-    const loc = { line: 100, column: 25 };
+    const loc = { sourceId: "source", line: 100, column: 25 };
     expect(toEditorPosition(loc)).toEqual({
       line: 99,
       column: 25
@@ -111,7 +83,10 @@ describe("toEditorPosition", () => {
 describe("toEditorRange", () => {
   it("returns an editor range", () => {
     const testId = "test-123";
-    const loc = { start: { line: 100, column: 25 }, end: { line: 200 } };
+    const loc = {
+      start: { line: 100, column: 25 },
+      end: { line: 200, column: 0 }
+    };
     expect(toEditorRange(testId, loc)).toEqual({
       start: { line: 99, column: 25 },
       end: { line: 199, column: 0 }
@@ -192,7 +167,7 @@ describe("markText", () => {
 
 describe("lineAtHeight", () => {
   it("calls codemirror API lineAtHeight", () => {
-    const e = { clientX: 30, clientY: 60 };
+    const e: any = { clientX: 30, clientY: 60 };
     expect(lineAtHeight(editor, "test-123", e)).toEqual(301);
     expect(editor.codeMirror.lineAtHeight).toHaveBeenCalledWith(e.clientY);
   });
@@ -200,9 +175,9 @@ describe("lineAtHeight", () => {
 
 describe("getSourceLocationFromMouseEvent", () => {
   it("calls codemirror API coordsChar & returns location", () => {
-    const loc = { sourceId: "test-123" };
-    const e = { clientX: 30, clientY: 60 };
-    expect(getSourceLocationFromMouseEvent(editor, loc, e)).toEqual({
+    const source = makeMockSource(undefined, "test-123");
+    const e: any = { clientX: 30, clientY: 60 };
+    expect(getSourceLocationFromMouseEvent(editor, source, e)).toEqual({
       sourceId: "test-123",
       line: 7,
       column: 31

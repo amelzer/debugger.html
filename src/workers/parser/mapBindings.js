@@ -4,60 +4,83 @@
 
 // @flow
 
-import { parseScript } from "./utils/ast";
+import { replaceNode } from "./utils/ast";
 import { isTopLevel } from "./utils/helpers";
 
 import generate from "@babel/generator";
 import * as t from "@babel/types";
 
+function getAssignmentTarget(node, bindings) {
+  if (t.isObjectPattern(node)) {
+    for (const property of node.properties) {
+      if (t.isRestElement(property)) {
+        property.argument = getAssignmentTarget(property.argument, bindings);
+      } else {
+        property.value = getAssignmentTarget(property.value, bindings);
+      }
+    }
+
+    return node;
+  }
+
+  if (t.isArrayPattern(node)) {
+    for (const [i, element] of node.elements.entries()) {
+      node.elements[i] = getAssignmentTarget(element, bindings);
+    }
+
+    return node;
+  }
+
+  if (t.isAssignmentPattern(node)) {
+    node.left = getAssignmentTarget(node.left, bindings);
+
+    return node;
+  }
+
+  if (t.isRestElement(node)) {
+    node.argument = getAssignmentTarget(node.argument, bindings);
+
+    return node;
+  }
+
+  if (t.isIdentifier(node)) {
+    return bindings.includes(node.name)
+      ? node
+      : t.memberExpression(t.identifier("self"), node);
+  }
+
+  return node;
+}
+
 // translates new bindings `var a = 3` into `self.a = 3`
 // and existing bindings `var a = 3` into `a = 3` for re-assignments
 function globalizeDeclaration(node, bindings) {
-  return node.declarations.map(declaration => {
-    const identifier = bindings.includes(declaration.id.name)
-      ? declaration.id
-      : t.memberExpression(t.identifier("self"), declaration.id);
-
-    return t.expressionStatement(
-      t.assignmentExpression("=", identifier, declaration.init)
-    );
-  });
+  return node.declarations.map(declaration =>
+    t.expressionStatement(
+      t.assignmentExpression(
+        "=",
+        getAssignmentTarget(declaration.id, bindings),
+        declaration.init || t.unaryExpression("void", t.numericLiteral(0))
+      )
+    )
+  );
 }
 
 // translates new bindings `a = 3` into `self.a = 3`
 // and keeps assignments the same for existing bindings.
 function globalizeAssignment(node, bindings) {
-  if (bindings.includes(node.left.name)) {
-    return node;
-  }
-
-  const identifier = t.memberExpression(t.identifier("self"), node.left);
-  return t.assignmentExpression(node.operator, identifier, node.right);
-}
-
-function replaceNode(ancestors, node) {
-  const parent = ancestors[ancestors.length - 1];
-
-  if (typeof parent.index === "number") {
-    if (Array.isArray(node)) {
-      parent.node[parent.key].splice(parent.index, 1, ...node);
-    } else {
-      parent.node[parent.key][parent.index] = node;
-    }
-  } else {
-    parent.node[parent.key] = node;
-  }
-}
-
-function hasDestructuring(node) {
-  return node.declarations.some(declaration => t.isPattern(declaration.id));
+  return t.assignmentExpression(
+    node.operator,
+    getAssignmentTarget(node.left, bindings),
+    node.right
+  );
 }
 
 export default function mapExpressionBindings(
   expression: string,
+  ast?: Object,
   bindings: string[] = []
 ): string {
-  const ast = parseScript(expression, { allowAwaitOutsideFunction: true });
   let isMapped = false;
   let shouldUpdate = true;
 
@@ -74,24 +97,16 @@ export default function mapExpressionBindings(
     }
 
     if (t.isAssignmentExpression(node)) {
-      if (t.isIdentifier(node.left)) {
+      if (t.isIdentifier(node.left) || t.isPattern(node.left)) {
         const newNode = globalizeAssignment(node, bindings);
         isMapped = true;
         return replaceNode(ancestors, newNode);
       }
 
-      if (t.isPattern(node.left)) {
-        shouldUpdate = false;
-        return;
-      }
-    }
-
-    if (!t.isVariableDeclaration(node)) {
       return;
     }
 
-    if (hasDestructuring(node)) {
-      shouldUpdate = false;
+    if (!t.isVariableDeclaration(node)) {
       return;
     }
 

@@ -9,28 +9,30 @@ import * as t from "@babel/types";
 import createSimplePath from "./utils/simple-path";
 import { traverseAst } from "./utils/ast";
 import {
-  isVariable,
   isFunction,
   isObjectShorthand,
   isComputedExpression,
   getObjectExpressionValue,
-  getVariableNames,
+  getPatternIdentifiers,
   getComments,
   getSpecifiers,
-  getCode
+  getCode,
+  nodeLocationKey,
+  getFunctionParameterNames
 } from "./utils/helpers";
 
 import { inferClassName } from "./utils/inferClassName";
 import getFunctionName from "./utils/getFunctionName";
+import { getFramework } from "./frameworks";
 
 import type { SimplePath, Node, TraversalAncestors } from "./utils/simple-path";
 
-type AstPosition = { line: number, column: number };
-type AstLocation = { end: AstPosition, start: AstPosition };
+import type { AstPosition, AstLocation } from "./types";
 
 export type SymbolDeclaration = {
   name: string,
-  location: AstLocation
+  location: AstLocation,
+  generatedLocation?: AstPosition
 };
 
 export type ClassDeclaration = SymbolDeclaration & {
@@ -43,7 +45,8 @@ export type ClassDeclaration = SymbolDeclaration & {
 export type FunctionDeclaration = SymbolDeclaration & {
   parameterNames: string[],
   klass: string | null,
-  identifier: Object
+  identifier: Object,
+  index: number
 };
 
 export type CallDeclaration = SymbolDeclaration & {
@@ -69,7 +72,6 @@ export type ImportDeclaration = {
 export type SymbolDeclarations = {|
   classes: Array<ClassDeclaration>,
   functions: Array<FunctionDeclaration>,
-  variables: Array<SymbolDeclaration>,
   memberExpressions: Array<MemberDeclaration>,
   callExpressions: Array<CallDeclaration>,
   objectProperties: Array<IdentifierDeclaration>,
@@ -79,63 +81,46 @@ export type SymbolDeclarations = {|
   literals: Array<IdentifierDeclaration>,
   hasJsx: boolean,
   hasTypes: boolean,
+  framework: ?string,
   loading: false
 |};
 
 let symbolDeclarations: Map<string, SymbolDeclarations> = new Map();
 
-function getFunctionParameterNames(path: SimplePath): string[] {
-  if (path.node.params != null) {
-    return path.node.params.map(param => {
-      if (param.type !== "AssignmentPattern") {
-        return param.name;
-      }
-
-      // Parameter with default value
-      if (
-        param.left.type === "Identifier" &&
-        param.right.type === "Identifier"
-      ) {
-        return `${param.left.name} = ${param.right.name}`;
-      } else if (
-        param.left.type === "Identifier" &&
-        param.right.type === "StringLiteral"
-      ) {
-        return `${param.left.name} = ${param.right.value}`;
-      } else if (
-        param.left.type === "Identifier" &&
-        param.right.type === "ObjectExpression"
-      ) {
-        return `${param.left.name} = {}`;
-      } else if (
-        param.left.type === "Identifier" &&
-        param.right.type === "ArrayExpression"
-      ) {
-        return `${param.left.name} = []`;
-      } else if (
-        param.left.type === "Identifier" &&
-        param.right.type === "NullLiteral"
-      ) {
-        return `${param.left.name} = null`;
-      }
-    });
+function getUniqueIdentifiers(identifiers) {
+  const newIdentifiers = [];
+  const locationKeys = new Set();
+  for (const newId of identifiers) {
+    const key = nodeLocationKey(newId);
+    if (!locationKeys.has(key)) {
+      locationKeys.add(key);
+      newIdentifiers.push(newId);
+    }
   }
-  return [];
+
+  return newIdentifiers;
 }
 
 /* eslint-disable complexity */
-function extractSymbol(path: SimplePath, symbols) {
-  if (isVariable(path)) {
-    symbols.variables.push(...getVariableNames(path));
-  }
-
+function extractSymbol(path: SimplePath, symbols, state) {
   if (isFunction(path)) {
+    const name = getFunctionName(path.node, path.parent);
+
+    if (!state.fnCounts[name]) {
+      state.fnCounts[name] = 0;
+    }
+    const index = state.fnCounts[name]++;
+
     symbols.functions.push({
-      name: getFunctionName(path.node, path.parent),
+      name,
       klass: inferClassName(path),
       location: path.node.loc,
       parameterNames: getFunctionParameterNames(path),
-      identifier: path.node.id
+      identifier: path.node.id,
+      // indicates the occurence of the function in a file
+      // e.g { name: foo, ... index: 4 } is the 4th foo function
+      // in the file
+      index
     });
   }
 
@@ -274,36 +259,15 @@ function extractSymbol(path: SimplePath, symbols) {
   if (t.isVariableDeclarator(path)) {
     const nodeId = path.node.id;
 
-    if (t.isArrayPattern(nodeId)) {
-      return;
-    }
-
-    const properties =
-      nodeId.properties && t.objectPattern(nodeId.properties)
-        ? nodeId.properties
-        : [
-            {
-              value: { name: nodeId.name },
-              loc: path.node.loc
-            }
-          ];
-
-    properties.forEach(function(property) {
-      const { start, end } = property.loc;
-      symbols.identifiers.push({
-        name: property.value.name,
-        expression: property.value.name,
-        location: { start, end }
-      });
-    });
+    symbols.identifiers.push(...getPatternIdentifiers(nodeId));
   }
 }
+
 /* eslint-enable complexity */
 
 function extractSymbols(sourceId): SymbolDeclarations {
   const symbols = {
     functions: [],
-    variables: [],
     callExpressions: [],
     memberExpressions: [],
     objectProperties: [],
@@ -314,7 +278,12 @@ function extractSymbols(sourceId): SymbolDeclarations {
     literals: [],
     hasJsx: false,
     hasTypes: false,
-    loading: false
+    loading: false,
+    framework: undefined
+  };
+
+  const state = {
+    fnCounts: Object.create(null)
   };
 
   const ast = traverseAst(sourceId, {
@@ -322,7 +291,7 @@ function extractSymbols(sourceId): SymbolDeclarations {
       try {
         const path = createSimplePath(ancestors);
         if (path) {
-          extractSymbol(path, symbols);
+          extractSymbol(path, symbols, state);
         }
       } catch (e) {
         console.error(e);
@@ -332,6 +301,8 @@ function extractSymbols(sourceId): SymbolDeclarations {
 
   // comments are extracted separately from the AST
   symbols.comments = getComments(ast);
+  symbols.identifiers = getUniqueIdentifiers(symbols.identifiers);
+  symbols.framework = getFramework(symbols);
 
   return symbols;
 }

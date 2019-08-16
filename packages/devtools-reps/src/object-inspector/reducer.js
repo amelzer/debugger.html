@@ -1,7 +1,6 @@
 /* This Source Code Form is subject to the terms of the Mozilla Public
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
-// @flow
 
 import type { ReduxAction, State } from "./types";
 
@@ -9,6 +8,7 @@ function initialState() {
   return {
     expandedPaths: new Set(),
     loadedProperties: new Map(),
+    evaluations: new Map(),
     actors: new Set()
   };
 }
@@ -49,6 +49,26 @@ function reducer(
     return cloneState();
   }
 
+  if (type === "GETTER_INVOKED") {
+    return cloneState({
+      actors: data.actor
+        ? new Set(state.actors || []).add(data.result.from)
+        : state.actors,
+      evaluations: new Map(state.evaluations).set(data.node.path, {
+        getterValue:
+          data.result &&
+          data.result.value &&
+          (data.result.value.return || data.result.value.throw)
+      })
+    });
+  }
+
+  // NOTE: we clear the state on resume because otherwise the scopes pane
+  // would be out of date. Bug 1514760
+  if (type === "RESUME" || type == "NAVIGATE") {
+    return initialState();
+  }
+
   return state;
 }
 
@@ -76,10 +96,15 @@ function getLoadedPropertyKeys(state) {
   return [...getLoadedProperties(state).keys()];
 }
 
+function getEvaluations(state) {
+  return getObjectInspectorState(state).evaluations;
+}
+
 const selectors = {
-  getExpandedPaths,
-  getExpandedPathKeys,
   getActors,
+  getEvaluations,
+  getExpandedPathKeys,
+  getExpandedPaths,
   getLoadedProperties,
   getLoadedPropertyKeys
 };

@@ -4,20 +4,18 @@
 
 // @flow
 
-import { getSymbols } from "../../workers/parser";
 import { findClosestFunction } from "../ast";
 
-import type { SymbolDeclarations } from "../../workers/parser";
-
-import type { Location, Source, ASTLocation } from "../../types";
+import type { SourceLocation, Source, ASTLocation } from "../../types";
+import type { Symbols } from "../../reducers/ast";
 
 export function getASTLocation(
   source: Source,
-  symbols: SymbolDeclarations,
-  location: Location
+  symbols: ?Symbols,
+  location: SourceLocation
 ): ASTLocation {
   if (source.isWasm || !symbols || symbols.loading) {
-    return { name: undefined, offset: location };
+    return { name: undefined, offset: location, index: 0 };
   }
 
   const scope = findClosestFunction(symbols, location);
@@ -27,15 +25,22 @@ export function getASTLocation(
     const line = location.line - scope.location.start.line;
     return {
       name: scope.name,
-      offset: { line, column: undefined }
+      offset: { line, column: undefined },
+      index: scope.index
     };
   }
-  return { name: undefined, offset: location };
+  return { name: undefined, offset: location, index: 0 };
 }
 
-export async function findScopeByName(source: Source, name: ?string) {
-  const symbols = await getSymbols(source.id);
-  const functions = symbols.functions;
+export function findFunctionByName(
+  symbols: Symbols,
+  name: ?string,
+  index: number
+) {
+  if (symbols.loading) {
+    return null;
+  }
 
-  return functions.find(node => node.name === name);
+  const functions = symbols.functions;
+  return functions.find(node => node.name === name && node.index === index);
 }

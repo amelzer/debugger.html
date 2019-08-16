@@ -6,7 +6,7 @@
 
 import React, { Component } from "react";
 import { showMenu } from "devtools-contextmenu";
-import { connect } from "react-redux";
+import { connect } from "../../utils/connect";
 import { score as fuzzaldrinScore } from "fuzzaldrin-plus";
 
 import { copyToTheClipboard } from "../../utils/clipboard";
@@ -14,9 +14,10 @@ import { findFunctionText } from "../../utils/function";
 
 import actions from "../../actions";
 import {
-  getSelectedSource,
+  getSelectedSourceWithContent,
   getSymbols,
-  getSelectedLocation
+  getSelectedLocation,
+  getContext
 } from "../../selectors";
 
 import OutlineFilter from "./OutlineFilter";
@@ -30,17 +31,18 @@ import type {
   SymbolDeclaration,
   FunctionDeclaration
 } from "../../workers/parser";
-import type { Source } from "../../types";
+import type { Source, Context } from "../../types";
 
 type Props = {
+  cx: Context,
   symbols: SymbolDeclarations,
   selectedSource: ?Source,
   alphabetizeOutline: boolean,
   onAlphabetizeClick: Function,
   selectedLocation: any,
-  selectLocation: ({ sourceId: string, line: number }) => void,
   getFunctionText: Function,
-  flashLineRange: Function
+  selectLocation: typeof actions.selectLocation,
+  flashLineRange: typeof actions.flashLineRange
 };
 
 type State = {
@@ -72,13 +74,16 @@ export class Outline extends Component<Props, State> {
   }
 
   selectItem(location: AstLocation) {
-    const { selectedSource, selectLocation } = this.props;
+    const { cx, selectedSource, selectLocation } = this.props;
     if (!selectedSource) {
       return;
     }
-    const selectedSourceId = selectedSource.id;
-    const startLine = location.start.line;
-    selectLocation({ sourceId: selectedSourceId, line: startLine });
+
+    selectLocation(cx, {
+      sourceId: selectedSource.id,
+      line: location.start.line,
+      column: location.start.column
+    });
   }
 
   onContextMenu(event: SyntheticEvent<HTMLElement>, func: SymbolDeclaration) {
@@ -174,12 +179,12 @@ export class Outline extends Component<Props, State> {
     );
 
     return (
-      <div className="outline-list__class" key={klass}>
+      <li className="outline-list__class" key={klass}>
         {heading}
         <ul className="outline-list__class-list">
           {classFunctions.map(func => this.renderFunction(func))}
         </ul>
-      </div>
+      </li>
     );
   }
 
@@ -204,7 +209,7 @@ export class Outline extends Component<Props, State> {
     }
 
     return (
-      <ul className="outline-list">
+      <ul className="outline-list devtools-monospace">
         {namedFunctions.map(func => this.renderFunction(func))}
         {classes.map(klass => this.renderClassFunctions(klass, classFunctions))}
       </ul>
@@ -257,13 +262,23 @@ export class Outline extends Component<Props, State> {
 }
 
 const mapStateToProps = state => {
-  const selectedSource = getSelectedSource(state);
-  const symbols = getSymbols(state, selectedSource);
+  const selectedSource = getSelectedSourceWithContent(state);
+  const symbols = selectedSource
+    ? getSymbols(state, selectedSource.source)
+    : null;
+
   return {
+    cx: getContext(state),
     symbols,
-    selectedSource,
+    selectedSource: selectedSource && selectedSource.source,
     selectedLocation: getSelectedLocation(state),
-    getFunctionText: line => findFunctionText(line, selectedSource, symbols)
+    getFunctionText: line => {
+      if (selectedSource) {
+        return findFunctionText(line, selectedSource, symbols);
+      }
+
+      return null;
+    }
   };
 };
 
@@ -271,7 +286,6 @@ export default connect(
   mapStateToProps,
   {
     selectLocation: actions.selectLocation,
-    getFunctionText: actions.getFunctionText,
     flashLineRange: actions.flashLineRange
   }
 )(Outline);

@@ -2,36 +2,42 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
-import { throttle } from "lodash";
+// @flow
 
-let newSources;
-let createSource;
-let supportsWasm = false;
+import { throttle } from "lodash";
+import type { QueuedSourceData } from "../types";
+
+let newQueuedSources;
 let queuedSources;
 let currentWork;
 
 async function dispatchNewSources() {
   const sources = queuedSources;
   queuedSources = [];
-
-  currentWork = await newSources(
-    sources.map(source => createSource(source, { supportsWasm }))
-  );
+  currentWork = await newQueuedSources(sources);
 }
 
 const queue = throttle(dispatchNewSources, 100);
 
 export default {
-  initialize: options => {
-    newSources = options.actions.newSources;
-    createSource = options.createSource;
-    supportsWasm = options.supportsWasm;
+  initialize: (actions: Object) => {
+    newQueuedSources = actions.newQueuedSources;
     queuedSources = [];
   },
-  queue: source => {
+  queue: (source: QueuedSourceData) => {
     queuedSources.push(source);
     queue();
   },
+  queueSources: (sources: QueuedSourceData[]) => {
+    if (sources.length > 0) {
+      queuedSources = queuedSources.concat(sources);
+      queue();
+    }
+  },
+
   flush: () => Promise.all([queue.flush(), currentWork]),
-  clear: () => queue.cancel()
+  clear: () => {
+    queuedSources = [];
+    queue.cancel();
+  }
 };

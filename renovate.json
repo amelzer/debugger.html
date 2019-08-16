@@ -1,0 +1,16 @@
+{
+  "separateMajorMinor": false,
+  "extends": [
+    "config:base",
+    ":preserveSemverRanges"
+  ],
+  "recreateClosed": false,
+  "statusCheckVerify": true,
+  "ignoreDeps": [
+    "react",
+    "react-dom",
+    "react-redux",
+    "redux",
+    "codemirror"
+  ]
+}

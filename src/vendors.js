@@ -2,6 +2,8 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
+// @flow
+
 /**
  * Vendors.js is a file used to bundle and expose all dependencies needed to run
  * the transpiled debugger modules when running in Firefox.
@@ -16,6 +18,7 @@
 
 // Modules imported with destructuring
 import * as devtoolsComponents from "devtools-components";
+// $FlowIgnore
 import * as devtoolsConfig from "devtools-config";
 import * as devtoolsContextmenu from "devtools-contextmenu";
 import * as devtoolsEnvironment from "devtools-environment";
@@ -30,7 +33,6 @@ import * as reselect from "reselect";
 import classnames from "classnames";
 import devtoolsSplitter from "devtools-splitter";
 import move from "lodash-move";
-import Svg from "./components/shared/Svg";
 
 // We cannot directly export literals containing special characters
 // (eg. "my-module/Test") which is why they are nested in "vendored".
@@ -49,8 +51,5 @@ export const vendored = {
   "lodash-move": move,
   "react-aria-components/src/tabs": reactAriaComponentsTabs,
   "react-transition-group/Transition": transition,
-  reselect,
-  // Svg is required via relative paths, so the key is not imported path.
-  // See .babel/transform-mc.js
-  Svg
+  reselect
 };

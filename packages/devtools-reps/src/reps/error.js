@@ -57,7 +57,7 @@ function ErrorRep(props) {
     const stacktrace = props.renderStacktrace
       ? props.renderStacktrace(parseStackString(preview.stack))
       : getStacktraceElements(props, preview);
-    content.push("\n", stacktrace);
+    content.push(stacktrace);
   }
 
   return span(
@@ -211,7 +211,9 @@ function parseStackString(stack) {
     // Given the input: "scriptLocation:2:100"
     // Result:
     // ["scriptLocation:2:100", "scriptLocation", "2", "100"]
-    const locationParts = location.match(/^(.*):(\d+):(\d+)$/);
+    const locationParts = location
+      ? location.match(/^(.*):(\d+):(\d+)$/)
+      : null;
 
     if (location && locationParts) {
       const [, filename, line, column] = locationParts;

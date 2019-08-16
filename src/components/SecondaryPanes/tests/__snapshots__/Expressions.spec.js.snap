@@ -17,7 +17,10 @@ exports[`Expressions should always have unique keys 1`] = `
         autoExpandDepth={0}
         createObjectClient={[Function]}
         disableWrap={true}
-        focusable={false}
+        onDOMNodeClick={[Function]}
+        onDOMNodeMouseOut={[Function]}
+        onDOMNodeMouseOver={[Function]}
+        onInspectIconClick={[Function]}
         roots={
           Array [
             Object {
@@ -56,7 +59,10 @@ exports[`Expressions should always have unique keys 1`] = `
         autoExpandDepth={0}
         createObjectClient={[Function]}
         disableWrap={true}
-        focusable={false}
+        onDOMNodeClick={[Function]}
+        onDOMNodeMouseOut={[Function]}
+        onDOMNodeMouseOver={[Function]}
+        onInspectIconClick={[Function]}
         roots={
           Array [
             Object {
@@ -129,7 +135,10 @@ exports[`Expressions should render 1`] = `
         autoExpandDepth={0}
         createObjectClient={[Function]}
         disableWrap={true}
-        focusable={false}
+        onDOMNodeClick={[Function]}
+        onDOMNodeMouseOut={[Function]}
+        onDOMNodeMouseOver={[Function]}
+        onInspectIconClick={[Function]}
         roots={
           Array [
             Object {
@@ -168,7 +177,10 @@ exports[`Expressions should render 1`] = `
         autoExpandDepth={0}
         createObjectClient={[Function]}
         disableWrap={true}
-        focusable={false}
+        onDOMNodeClick={[Function]}
+        onDOMNodeMouseOut={[Function]}
+        onDOMNodeMouseOver={[Function]}
+        onInspectIconClick={[Function]}
         roots={
           Array [
             Object {

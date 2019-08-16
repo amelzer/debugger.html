@@ -3,10 +3,12 @@
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
 // @flow
-import PropTypes from "prop-types";
 import React, { Component } from "react";
-import { connect } from "react-redux";
-import { features } from "../utils/prefs";
+import PropTypes from "prop-types";
+import classnames from "classnames";
+
+import { connect } from "../utils/connect";
+import { prefs, features } from "../utils/prefs";
 import actions from "../actions";
 import A11yIntention from "./A11yIntention";
 import { ShortcutsModal } from "./ShortcutsModal";
@@ -16,7 +18,8 @@ import {
   getPaneCollapse,
   getActiveSearch,
   getQuickOpenEnabled,
-  getOrientation
+  getOrientation,
+  getCanRewind
 } from "../selectors";
 
 import type { OrientationType } from "../reducers/types";
@@ -32,7 +35,7 @@ const isMacOS = appinfo.OS === "Darwin";
 
 const horizontalLayoutBreakpoint = window.matchMedia("(min-width: 800px)");
 const verticalLayoutBreakpoint = window.matchMedia(
-  "(min-width: 10px) and (max-width: 800px)"
+  "(min-width: 10px) and (max-width: 799px)"
 );
 
 import "./variables.css";
@@ -40,6 +43,8 @@ import "./App.css";
 
 // $FlowIgnore
 import "devtools-launchpad/src/components/Root.css";
+
+import type { ActiveSearchType } from "../selectors";
 
 import "./shared/menu.css";
 import "./shared/reps.css";
@@ -51,21 +56,24 @@ import Editor from "./Editor";
 import SecondaryPanes from "./SecondaryPanes";
 import WelcomeBox from "./WelcomeBox";
 import EditorTabs from "./Editor/Tabs";
+import EditorFooter from "./Editor/Footer";
 import QuickOpenModal from "./QuickOpenModal";
+import WhyPaused from "./SecondaryPanes/WhyPaused";
 
 type Props = {
   selectedSource: Source,
   orientation: OrientationType,
   startPanelCollapsed: boolean,
   endPanelCollapsed: boolean,
-  activeSearch: string,
+  activeSearch: ActiveSearchType,
   quickOpenEnabled: boolean,
-  setActiveSearch: string => void,
-  closeActiveSearch: () => void,
-  closeProjectSearch: () => void,
-  openQuickOpen: (query?: string) => void,
-  closeQuickOpen: () => void,
-  setOrientation: OrientationType => void
+  canRewind: boolean,
+  setActiveSearch: typeof actions.setActiveSearch,
+  closeActiveSearch: typeof actions.closeActiveSearch,
+  closeProjectSearch: typeof actions.closeProjectSearch,
+  openQuickOpen: typeof actions.openQuickOpen,
+  closeQuickOpen: typeof actions.closeQuickOpen,
+  setOrientation: typeof actions.setOrientation
 };
 
 type State = {
@@ -93,7 +101,7 @@ class App extends Component<Props, State> {
   }
 
   getChildContext = () => {
-    return { shortcuts };
+    return { shortcuts, l10n: L10N };
   };
 
   componentDidMount() {
@@ -145,6 +153,7 @@ class App extends Component<Props, State> {
       closeQuickOpen,
       quickOpenEnabled
     } = this.props;
+    const { shortcutsModalEnabled } = this.state;
 
     if (activeSearch) {
       e.preventDefault();
@@ -154,6 +163,10 @@ class App extends Component<Props, State> {
     if (quickOpenEnabled) {
       e.preventDefault();
       closeQuickOpen();
+    }
+
+    if (shortcutsModalEnabled) {
+      this.toggleShortcutsModal();
     }
   };
 
@@ -185,7 +198,6 @@ class App extends Component<Props, State> {
       return;
     }
     openQuickOpen();
-    return;
   };
 
   onLayoutChange = () => {
@@ -223,12 +235,16 @@ class App extends Component<Props, State> {
             startPanelSize={startPanelSize}
             endPanelSize={endPanelSize}
           />
+          {this.props.endPanelCollapsed ? (
+            <WhyPaused horizontal={horizontal} />
+          ) : null}
           {!this.props.selectedSource ? (
             <WelcomeBox
               horizontal={horizontal}
               toggleShortcutsModal={() => this.toggleShortcutsModal()}
             />
           ) : null}
+          <EditorFooter horizontal={horizontal} />
           <ProjectSearch />
         </div>
       </div>
@@ -241,29 +257,41 @@ class App extends Component<Props, State> {
     }));
   }
 
+  // Important so that the tabs chevron updates appropriately when
+  // the user resizes the left or right columns
+  triggerEditorPaneResize() {
+    const editorPane = window.document.querySelector(".editor-pane");
+    if (editorPane) {
+      editorPane.dispatchEvent(new Event("resizeend"));
+    }
+  }
+
   renderLayout = () => {
     const { startPanelCollapsed, endPanelCollapsed } = this.props;
     const horizontal = this.isHorizontal();
 
-    const maxSize = horizontal ? "70%" : "95%";
-    const primaryInitialSize = horizontal ? "250px" : "150px";
-
     return (
       <SplitBox
         style={{ width: "100vw" }}
-        initialHeight={400}
-        initialWidth={300}
+        initialSize={prefs.endPanelSize}
         minSize={30}
-        maxSize={maxSize}
+        maxSize="70%"
         splitterSize={1}
         vert={horizontal}
+        onResizeEnd={num => {
+          prefs.endPanelSize = num;
+          this.triggerEditorPaneResize();
+        }}
         startPanel={
           <SplitBox
             style={{ width: "100vw" }}
-            initialSize={primaryInitialSize}
+            initialSize={prefs.startPanelSize}
             minSize={30}
             maxSize="85%"
             splitterSize={1}
+            onResizeEnd={num => {
+              prefs.startPanelSize = num;
+            }}
             startPanelCollapsed={startPanelCollapsed}
             startPanel={<PrimaryPanes horizontal={horizontal} />}
             endPanel={this.renderEditorPane()}
@@ -298,9 +326,9 @@ class App extends Component<Props, State> {
   }
 
   render() {
-    const { quickOpenEnabled } = this.props;
+    const { quickOpenEnabled, canRewind } = this.props;
     return (
-      <div className="debugger">
+      <div className={classnames("debugger", { "can-rewind": canRewind })}>
         <A11yIntention>
           {this.renderLayout()}
           {quickOpenEnabled === true && (
@@ -316,9 +344,13 @@ class App extends Component<Props, State> {
   }
 }
 
-App.childContextTypes = { shortcuts: PropTypes.object };
+App.childContextTypes = {
+  shortcuts: PropTypes.object,
+  l10n: PropTypes.object
+};
 
 const mapStateToProps = state => ({
+  canRewind: getCanRewind(state),
   selectedSource: getSelectedSource(state),
   startPanelCollapsed: getPaneCollapse(state, "start"),
   endPanelCollapsed: getPaneCollapse(state, "end"),

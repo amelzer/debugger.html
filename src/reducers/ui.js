@@ -12,7 +12,7 @@
 import makeRecord from "../utils/makeRecord";
 import { prefs } from "../utils/prefs";
 
-import type { Source } from "../types";
+import type { Source, PartialRange, SourceLocation } from "../types";
 
 import type { Action, panelPositionType } from "../actions/types";
 import type { Record } from "../utils/makeRecord";
@@ -23,37 +23,39 @@ export type OrientationType = "horizontal" | "vertical";
 
 export type SelectedPrimaryPaneTabType = "sources" | "outline";
 
+type Viewport = PartialRange;
+
 export type UIState = {
   selectedPrimaryPaneTab: SelectedPrimaryPaneTabType,
   activeSearch: ?ActiveSearchType,
-  contextMenu: any,
   shownSource: ?Source,
   startPanelCollapsed: boolean,
   endPanelCollapsed: boolean,
   frameworkGroupingOn: boolean,
   orientation: OrientationType,
+  viewport: ?Viewport,
   highlightedLineRange?: {
     start?: number,
     end?: number,
     sourceId?: number
   },
-  conditionalPanelLine: null | number
+  conditionalPanelLocation: null | SourceLocation,
+  isLogPoint: boolean
 };
 
-export const createUIState = makeRecord(
-  ({
-    selectedPrimaryPaneTab: "sources",
-    activeSearch: null,
-    contextMenu: {},
-    shownSource: null,
-    startPanelCollapsed: prefs.startPanelCollapsed,
-    endPanelCollapsed: prefs.endPanelCollapsed,
-    frameworkGroupingOn: prefs.frameworkGroupingOn,
-    highlightedLineRange: undefined,
-    conditionalPanelLine: null,
-    orientation: "horizontal"
-  }: UIState)
-);
+export const createUIState: () => Record<UIState> = makeRecord({
+  selectedPrimaryPaneTab: "sources",
+  activeSearch: null,
+  shownSource: null,
+  startPanelCollapsed: prefs.startPanelCollapsed,
+  endPanelCollapsed: prefs.endPanelCollapsed,
+  frameworkGroupingOn: prefs.frameworkGroupingOn,
+  highlightedLineRange: undefined,
+  conditionalPanelLocation: null,
+  isLogPoint: false,
+  orientation: "horizontal",
+  viewport: null
+});
 
 function update(
   state: Record<UIState> = createUIState(),
@@ -67,10 +69,6 @@ function update(
     case "TOGGLE_FRAMEWORK_GROUPING": {
       prefs.frameworkGroupingOn = action.value;
       return state.set("frameworkGroupingOn", action.value);
-    }
-
-    case "SET_CONTEXT_MENU": {
-      return state.set("contextMenu", action.contextMenu);
     }
 
     case "SET_ORIENTATION": {
@@ -106,10 +104,12 @@ function update(
       return state.set("highlightedLineRange", {});
 
     case "OPEN_CONDITIONAL_PANEL":
-      return state.set("conditionalPanelLine", action.line);
+      return state
+        .set("conditionalPanelLocation", action.location)
+        .set("isLogPoint", action.log);
 
     case "CLOSE_CONDITIONAL_PANEL":
-      return state.set("conditionalPanelLine", null);
+      return state.set("conditionalPanelLocation", null);
 
     case "SET_PRIMARY_PANE_TAB":
       return state.set("selectedPrimaryPaneTab", action.tabName);
@@ -119,6 +119,10 @@ function update(
         return state.set("activeSearch", null);
       }
       return state;
+    }
+
+    case "SET_VIEWPORT": {
+      return state.set("viewport", action.viewport);
     }
 
     case "NAVIGATE": {
@@ -132,7 +136,7 @@ function update(
 }
 
 // NOTE: we'd like to have the app state fully typed
-// https://github.com/devtools-html/debugger.html/blob/master/src/reducers/sources.js#L179-L185
+// https://github.com/firefox-devtools/debugger/blob/master/src/reducers/sources.js#L179-L185
 type OuterState = { ui: Record<UIState> };
 
 export function getSelectedPrimaryPaneTab(
@@ -143,10 +147,6 @@ export function getSelectedPrimaryPaneTab(
 
 export function getActiveSearch(state: OuterState): ActiveSearchType {
   return state.ui.get("activeSearch");
-}
-
-export function getContextMenu(state: OuterState): any {
-  return state.ui.get("contextMenu");
 }
 
 export function getFrameworkGroupingState(state: OuterState): boolean {
@@ -172,12 +172,22 @@ export function getHighlightedLineRange(state: OuterState) {
   return state.ui.get("highlightedLineRange");
 }
 
-export function getConditionalPanelLine(state: OuterState): null | number {
-  return state.ui.get("conditionalPanelLine");
+export function getConditionalPanelLocation(
+  state: OuterState
+): null | SourceLocation {
+  return state.ui.get("conditionalPanelLocation");
 }
 
-export function getOrientation(state: OuterState): boolean {
+export function getLogPointStatus(state: OuterState): boolean {
+  return state.ui.get("isLogPoint");
+}
+
+export function getOrientation(state: OuterState): OrientationType {
   return state.ui.get("orientation");
+}
+
+export function getViewport(state: OuterState) {
+  return state.ui.get("viewport");
 }
 
 export default update;

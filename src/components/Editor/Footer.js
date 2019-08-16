@@ -4,97 +4,163 @@
 
 // @flow
 import React, { PureComponent } from "react";
-import { connect } from "react-redux";
+import { connect } from "../../utils/connect";
 import classnames from "classnames";
-import Svg from "../shared/Svg";
 import actions from "../../actions";
 import {
-  getSelectedSource,
+  getSelectedSourceWithContent,
   getPrettySource,
-  getPaneCollapse
+  getPaneCollapse,
+  getContext
 } from "../../selectors";
 
-import { features } from "../../utils/prefs";
+import { isFulfilled } from "../../utils/async-value";
 import {
   isPretty,
-  isLoaded,
   getFilename,
   isOriginal,
-  isLoading
+  shouldBlackbox
 } from "../../utils/source";
 import { getGeneratedSource } from "../../reducers/sources";
-import { shouldShowFooter, shouldShowPrettyPrint } from "../../utils/editor";
+import { shouldShowPrettyPrint } from "../../utils/editor";
 
 import { PaneToggleButton } from "../shared/Button";
+import AccessibleImage from "../shared/AccessibleImage";
 
-import type { Source } from "../../types";
+import type { SourceWithContent, Source, Context } from "../../types";
 
 import "./Footer.css";
 
+type CursorPosition = {
+  line: number,
+  column: number
+};
+
 type Props = {
-  selectedSource: Source,
+  cx: Context,
+  selectedSourceWithContent: ?SourceWithContent,
   mappedSource: Source,
   endPanelCollapsed: boolean,
   horizontal: boolean,
-  togglePrettyPrint: string => void,
-  toggleBlackBox: Object => void,
-  jumpToMappedLocation: (Source: any) => void,
-  recordCoverage: () => void,
-  togglePaneCollapse: () => void
+  togglePrettyPrint: typeof actions.togglePrettyPrint,
+  toggleBlackBox: typeof actions.toggleBlackBox,
+  jumpToMappedLocation: typeof actions.jumpToMappedLocation,
+  togglePaneCollapse: typeof actions.togglePaneCollapse
 };
 
-class SourceFooter extends PureComponent<Props> {
-  prettyPrintButton() {
-    const { selectedSource, togglePrettyPrint } = this.props;
+type State = {
+  cursorPosition: CursorPosition
+};
 
-    if (isLoading(selectedSource) && selectedSource.isPrettyPrinted) {
+class SourceFooter extends PureComponent<Props, State> {
+  constructor() {
+    super();
+
+    this.state = { cursorPosition: { line: 0, column: 0 } };
+  }
+
+  componentDidUpdate() {
+    const eventDoc = document.querySelector(".editor-mount .CodeMirror");
+    // querySelector can return null
+    if (eventDoc) {
+      this.toggleCodeMirror(eventDoc, true);
+    }
+  }
+
+  componentWillUnmount() {
+    const eventDoc = document.querySelector(".editor-mount .CodeMirror");
+
+    if (eventDoc) {
+      this.toggleCodeMirror(eventDoc, false);
+    }
+  }
+
+  toggleCodeMirror(eventDoc: Object, toggle: boolean) {
+    if (toggle === true) {
+      eventDoc.CodeMirror.on("cursorActivity", this.onCursorChange);
+    } else {
+      eventDoc.CodeMirror.off("cursorActivity", this.onCursorChange);
+    }
+  }
+
+  prettyPrintButton() {
+    const { cx, selectedSourceWithContent, togglePrettyPrint } = this.props;
+
+    if (!selectedSourceWithContent) {
+      return;
+    }
+
+    if (
+      !selectedSourceWithContent.content &&
+      selectedSourceWithContent.source.isPrettyPrinted
+    ) {
       return (
-        <div className="loader">
-          <Svg name="loader" />
+        <div className="loader" key="pretty-loader">
+          <AccessibleImage className="loader" />
         </div>
       );
     }
 
-    if (!shouldShowPrettyPrint(selectedSource)) {
+    const sourceContent =
+      selectedSourceWithContent.content &&
+      isFulfilled(selectedSourceWithContent.content)
+        ? selectedSourceWithContent.content.value
+        : null;
+    if (
+      !shouldShowPrettyPrint(
+        selectedSourceWithContent.source,
+        sourceContent || { type: "text", value: "", contentType: undefined }
+      )
+    ) {
       return;
     }
 
     const tooltip = L10N.getStr("sourceTabs.prettyPrint");
-    const sourceLoaded = selectedSource && isLoaded(selectedSource);
+    const sourceLoaded = !!selectedSourceWithContent.content;
 
     const type = "prettyPrint";
     return (
       <button
-        onClick={() => togglePrettyPrint(selectedSource.id)}
+        onClick={() =>
+          togglePrettyPrint(cx, selectedSourceWithContent.source.id)
+        }
         className={classnames("action", type, {
           active: sourceLoaded,
-          pretty: isPretty(selectedSource)
+          pretty: isPretty(selectedSourceWithContent.source)
         })}
         key={type}
         title={tooltip}
         aria-label={tooltip}
       >
-        <img className={type} />
+        <AccessibleImage className={type} />
       </button>
     );
   }
 
   blackBoxButton() {
-    const { selectedSource, toggleBlackBox } = this.props;
-    const sourceLoaded = selectedSource && isLoaded(selectedSource);
+    const { cx, selectedSourceWithContent, toggleBlackBox } = this.props;
+    const sourceLoaded =
+      selectedSourceWithContent && selectedSourceWithContent.content;
 
-    if (!sourceLoaded || selectedSource.isPrettyPrinted) {
+    if (!selectedSourceWithContent) {
       return;
     }
 
-    const blackboxed = selectedSource.isBlackBoxed;
+    if (!shouldBlackbox(selectedSourceWithContent.source)) {
+      return;
+    }
 
-    const tooltip = L10N.getStr("sourceFooter.blackbox");
+    const blackboxed = selectedSourceWithContent.source.isBlackBoxed;
+
+    const tooltip = blackboxed
+      ? L10N.getStr("sourceFooter.unblackbox")
+      : L10N.getStr("sourceFooter.blackbox");
+
     const type = "black-box";
 
     return (
       <button
-        onClick={() => toggleBlackBox(selectedSource)}
+        onClick={() => toggleBlackBox(cx, selectedSourceWithContent.source)}
         className={classnames("action", type, {
           active: sourceLoaded,
           blackboxed: blackboxed
@@ -103,40 +169,7 @@ class SourceFooter extends PureComponent<Props> {
         title={tooltip}
         aria-label={tooltip}
       >
-        <img className="blackBox" />
-      </button>
-    );
-  }
-
-  blackBoxSummary() {
-    const { selectedSource } = this.props;
-
-    if (!selectedSource || !selectedSource.isBlackBoxed) {
-      return;
-    }
-
-    return (
-      <span className="blackbox-summary">
-        {L10N.getStr("sourceFooter.blackboxed")}
-      </span>
-    );
-  }
-
-  coverageButton() {
-    const { recordCoverage } = this.props;
-
-    if (!features.codeCoverage) {
-      return;
-    }
-
-    return (
-      <button
-        className="coverage action"
-        title={L10N.getStr("sourceFooter.codeCoverage")}
-        onClick={() => recordCoverage()}
-        aria-label={L10N.getStr("sourceFooter.codeCoverage")}
-      >
-        C
+        <AccessibleImage className="blackBox" />
       </button>
     );
   }
@@ -148,29 +181,36 @@ class SourceFooter extends PureComponent<Props> {
 
     return (
       <PaneToggleButton
-        position="end"
-        collapsed={!this.props.endPanelCollapsed}
+        key="toggle"
+        collapsed={this.props.endPanelCollapsed}
         horizontal={this.props.horizontal}
-        handleClick={this.props.togglePaneCollapse}
+        handleClick={(this.props.togglePaneCollapse: any)}
+        position="end"
       />
     );
   }
 
   renderCommands() {
-    return (
-      <div className="commands">
-        {this.prettyPrintButton()}
-        {this.blackBoxButton()}
-        {this.blackBoxSummary()}
-        {this.coverageButton()}
-      </div>
+    const commands = [this.blackBoxButton(), this.prettyPrintButton()].filter(
+      Boolean
     );
+
+    return commands.length ? <div className="commands">{commands}</div> : null;
   }
 
   renderSourceSummary() {
-    const { mappedSource, jumpToMappedLocation, selectedSource } = this.props;
+    const {
+      cx,
+      mappedSource,
+      jumpToMappedLocation,
+      selectedSourceWithContent
+    } = this.props;
 
-    if (!mappedSource || !isOriginal(selectedSource)) {
+    if (
+      !mappedSource ||
+      !selectedSourceWithContent ||
+      !isOriginal(selectedSourceWithContent.source)
+    ) {
       return null;
     }
 
@@ -181,14 +221,14 @@ class SourceFooter extends PureComponent<Props> {
     );
     const title = L10N.getFormatStr("sourceFooter.mappedSource", filename);
     const mappedSourceLocation = {
-      sourceId: selectedSource.id,
+      sourceId: selectedSourceWithContent.source.id,
       line: 1,
       column: 1
     };
     return (
       <button
         className="mapped-source"
-        onClick={() => jumpToMappedLocation(mappedSourceLocation)}
+        onClick={() => jumpToMappedLocation(cx, mappedSourceLocation)}
         title={tooltip}
       >
         <span>{title}</span>
@@ -196,31 +236,63 @@ class SourceFooter extends PureComponent<Props> {
     );
   }
 
-  render() {
-    const { selectedSource, horizontal } = this.props;
+  onCursorChange = event => {
+    const { line, ch } = event.doc.getCursor();
+    this.setState({ cursorPosition: { line, column: ch } });
+  };
 
-    if (!shouldShowFooter(selectedSource, horizontal)) {
+  renderCursorPosition() {
+    if (!this.props.selectedSourceWithContent) {
       return null;
     }
 
+    const { line, column } = this.state.cursorPosition;
+
+    const text = L10N.getFormatStr(
+      "sourceFooter.currentCursorPosition",
+      line + 1,
+      column + 1
+    );
+    const title = L10N.getFormatStr(
+      "sourceFooter.currentCursorPosition.tooltip",
+      line + 1,
+      column + 1
+    );
+    return (
+      <div className="cursor-position" title={title}>
+        {text}
+      </div>
+    );
+  }
+
+  render() {
     return (
       <div className="source-footer">
-        {this.renderCommands()}
-        {this.renderSourceSummary()}
-        {this.renderToggleButton()}
+        <div className="source-footer-start">{this.renderCommands()}</div>
+        <div className="source-footer-end">
+          {this.renderSourceSummary()}
+          {this.renderCursorPosition()}
+          {this.renderToggleButton()}
+        </div>
       </div>
     );
   }
 }
 
 const mapStateToProps = state => {
-  const selectedSource = getSelectedSource(state);
-  const selectedId = selectedSource.id;
+  const selectedSourceWithContent = getSelectedSourceWithContent(state);
 
   return {
-    selectedSource,
-    mappedSource: getGeneratedSource(state, selectedSource),
-    prettySource: getPrettySource(state, selectedId),
+    cx: getContext(state),
+    selectedSourceWithContent,
+    mappedSource: getGeneratedSource(
+      state,
+      selectedSourceWithContent && selectedSourceWithContent.source
+    ),
+    prettySource: getPrettySource(
+      state,
+      selectedSourceWithContent ? selectedSourceWithContent.source.id : null
+    ),
     endPanelCollapsed: getPaneCollapse(state, "end")
   };
 };
@@ -231,7 +303,6 @@ export default connect(
     togglePrettyPrint: actions.togglePrettyPrint,
     toggleBlackBox: actions.toggleBlackBox,
     jumpToMappedLocation: actions.jumpToMappedLocation,
-    recordCoverage: actions.recordCoverage,
     togglePaneCollapse: actions.togglePaneCollapse
   }
 )(SourceFooter);

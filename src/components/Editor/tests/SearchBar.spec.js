@@ -2,12 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
+// @flow
+
 import React from "react";
 import { shallow } from "enzyme";
 import SearchBar from "../SearchBar";
 import "../../../workers/search";
 import "../../../utils/editor";
 
+// $FlowIgnore
 const SearchBarComponent = SearchBar.WrappedComponent;
 
 jest.mock("../../../workers/search", () => ({
@@ -29,6 +32,7 @@ function generateDefaults() {
     selectedSource: {
       text: " text text query text"
     },
+    selectedContentLoaded: true,
     setFileSearchQuery: msg => msg,
     symbolSearchResults: [],
     modifiers: {
@@ -64,7 +68,7 @@ describe("doSearch", () => {
       .find("SearchInput")
       .simulate("change", { target: { value: "query" } });
 
-    const doSearchArgs = props.doSearch.mock.calls[0][0];
+    const doSearchArgs = props.doSearch.mock.calls[0][1];
     expect(doSearchArgs).toMatchSnapshot();
   });
 });

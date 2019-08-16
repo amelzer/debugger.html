@@ -2,19 +2,21 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
+// @flow
+
 import { getASTLocation } from "../astBreakpointLocation.js";
 import {
-  getSource,
-  getOriginalSource
+  populateSource,
+  populateOriginalSource
 } from "../../../workers/parser/tests/helpers";
-import { setSource } from "../../../workers/parser/sources";
 import { getSymbols } from "../../../workers/parser/getSymbols";
 import cases from "jest-in-case";
 
 async function setup({ file, location, functionName, original }) {
-  const source = original ? getOriginalSource(file) : getSource(file);
+  const { source } = original
+    ? populateOriginalSource(file)
+    : populateSource(file);
 
-  setSource(source);
   const symbols = getSymbols(source.id);
 
   const astLocation = getASTLocation(source, symbols, location);

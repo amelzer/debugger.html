@@ -4,7 +4,7 @@
 
 // @flow
 
-import type { ColumnPosition } from "../../types";
+import type { Position } from "../../types";
 import { parseScript } from "./utils/ast";
 import { buildScopeList } from "./getScopes";
 import generate from "@babel/generator";
@@ -30,17 +30,17 @@ function getFirstExpression(ast) {
   return statements[0].expression;
 }
 
-function locationKey(start: ColumnPosition): string {
+function locationKey(start: Position): string {
   return `${start.line}:${start.column}`;
 }
 
 export default function mapOriginalExpression(
   expression: string,
+  ast: ?Object,
   mappings: {
     [string]: string | null
   }
 ): string {
-  const ast = parseScript(expression, { allowAwaitOutsideFunction: true });
   const scopes = buildScopeList(ast, "");
   let shouldUpdate = false;
 
@@ -90,6 +90,13 @@ export default function mapOriginalExpression(
 
   t.traverse(ast, (node, ancestors) => {
     if (!t.isIdentifier(node) && !t.isThisExpression(node)) {
+      return;
+    }
+
+    const ancestor = ancestors[ancestors.length - 1];
+    // Shorthand properties can have a key and value with `node.loc.start` value
+    // and we only want to replace the value.
+    if (t.isObjectProperty(ancestor.node) && ancestor.key !== "value") {
       return;
     }
 

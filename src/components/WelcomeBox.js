@@ -5,13 +5,12 @@
 // @flow
 import React, { Component } from "react";
 
-import { connect } from "react-redux";
+import { connect } from "../utils/connect";
 
 import actions from "../actions";
 import { getPaneCollapse } from "../selectors";
 import { formatKeyShortcut } from "../utils/text";
 
-import { PaneToggleButton } from "./shared/Button";
 import type { ActiveSearchType } from "../reducers/ui";
 
 import "./WelcomeBox.css";
@@ -21,27 +20,11 @@ type Props = {
   endPanelCollapsed: boolean,
   togglePaneCollapse: Function,
   setActiveSearch: (?ActiveSearchType) => any,
-  openQuickOpen: (query?: string) => void,
+  openQuickOpen: typeof actions.openQuickOpen,
   toggleShortcutsModal: () => void
 };
 
 export class WelcomeBox extends Component<Props> {
-  renderToggleButton() {
-    const { horizontal, endPanelCollapsed, togglePaneCollapse } = this.props;
-    if (horizontal) {
-      return;
-    }
-
-    return (
-      <PaneToggleButton
-        position="end"
-        collapsed={!endPanelCollapsed}
-        horizontal={horizontal}
-        handleClick={togglePaneCollapse}
-      />
-    );
-  }
-
   render() {
     const searchSourcesShortcut = formatKeyShortcut(
       L10N.getStr("sources.search.key2")
@@ -92,7 +75,6 @@ export class WelcomeBox extends Component<Props> {
               <span className="shortcutLabel">{allShortcutsLabel}</span>
             </p>
           </div>
-          {this.renderToggleButton()}
         </div>
       </div>
     );

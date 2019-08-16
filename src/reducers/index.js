@@ -2,13 +2,15 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
+// @flow
+
 /**
  * Reducer index
  * @module reducers/index
  */
 
 import expressions from "./expressions";
-import eventListeners from "./event-listeners";
+import sourceActors from "./source-actors";
 import sources from "./sources";
 import tabs from "./tabs";
 import breakpoints from "./breakpoints";
@@ -18,16 +20,18 @@ import pause from "./pause";
 import ui from "./ui";
 import fileSearch from "./file-search";
 import ast from "./ast";
-import coverage from "./coverage";
 import projectTextSearch from "./project-text-search";
 import quickOpen from "./quick-open";
 import sourceTree from "./source-tree";
 import debuggee from "./debuggee";
+import eventListenerBreakpoints from "./event-listeners";
+
+// eslint-disable-next-line import/named
 import { objectInspector } from "devtools-reps";
 
 export default {
   expressions,
-  eventListeners,
+  sourceActors,
   sources,
   tabs,
   breakpoints,
@@ -37,10 +41,10 @@ export default {
   ui,
   fileSearch,
   ast,
-  coverage,
   projectTextSearch,
   quickOpen,
   sourceTree,
   debuggee,
-  objectInspector: objectInspector.reducer.default
+  objectInspector: objectInspector.reducer.default,
+  eventListenerBreakpoints
 };

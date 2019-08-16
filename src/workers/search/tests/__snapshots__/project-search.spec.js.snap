@@ -6,16 +6,16 @@ Array [
     "column": 11,
     "line": 2,
     "match": "foo",
+    "matchIndex": 11,
     "sourceId": "bar.js",
-    "text": "  function foo() {",
     "value": "  function foo() {",
   },
   Object {
     "column": 4,
     "line": 3,
     "match": "foo",
+    "matchIndex": 4,
     "sourceId": "bar.js",
-    "text": "    foo();",
     "value": "    foo();",
   },
 ]

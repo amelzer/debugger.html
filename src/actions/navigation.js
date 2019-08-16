@@ -6,21 +6,14 @@
 
 import { clearDocuments } from "../utils/editor";
 import sourceQueue from "../utils/source-queue";
-import { getSources } from "../reducers/sources";
+import { getSourceList } from "../reducers/sources";
 import { waitForMs } from "../utils/utils";
 
-import { newSources } from "./sources";
+import { newGeneratedSources } from "./sources";
 import { updateWorkers } from "./debuggee";
 
-import {
-  clearASTs,
-  clearSymbols,
-  clearScopes,
-  clearSources
-} from "../workers/parser";
-
 import { clearWasmStates } from "../utils/wasm";
-
+import { getMainThread } from "../selectors";
 import type { Action, ThunkArgs } from "./types";
 
 /**
@@ -33,31 +26,38 @@ import type { Action, ThunkArgs } from "./types";
  * @static
  */
 export function willNavigate(event: Object) {
-  return async function({ dispatch, getState, client, sourceMaps }: ThunkArgs) {
-    await sourceMaps.clearSourceMaps();
+  return async function({
+    dispatch,
+    getState,
+    client,
+    sourceMaps,
+    parser
+  }: ThunkArgs) {
+    sourceQueue.clear();
+    sourceMaps.clearSourceMaps();
     clearWasmStates();
     clearDocuments();
-    clearSymbols();
-    clearASTs();
-    clearScopes();
-    clearSources();
-    dispatch(navigate(event.url));
+    parser.clear();
+    client.detachWorkers();
+    const thread = getMainThread(getState());
+
+    dispatch({
+      type: "NAVIGATE",
+      mainThread: { ...thread, url: event.url }
+    });
   };
 }
 
-export function navigate(url: string): Action {
-  sourceQueue.clear();
-
-  return {
-    type: "NAVIGATE",
-    url
-  };
-}
-
-export function connect(url: string, canRewind: boolean) {
+export function connect(url: string, actor: string, canRewind: boolean) {
   return async function({ dispatch }: ThunkArgs) {
     await dispatch(updateWorkers());
-    dispatch(({ type: "CONNECT", url, canRewind }: Action));
+    dispatch(
+      ({
+        type: "CONNECT",
+        mainThread: { url, actor, type: -1, name: "" },
+        canRewind
+      }: Action)
+    );
   };
 }
 
@@ -66,11 +66,15 @@ export function connect(url: string, canRewind: boolean) {
  * @static
  */
 export function navigated() {
-  return async function({ dispatch, getState, client }: ThunkArgs) {
+  return async function({ dispatch, getState, client, panel }: ThunkArgs) {
+    // this time out is used to wait for sources. If we have 0 sources,
+    // it is likely that the sources are being loaded from the bfcache,
+    // and we should make an explicit request to the server to load them.
     await waitForMs(100);
-    if (Object.keys(getSources(getState())).length == 0) {
+    if (getSourceList(getState()).length == 0) {
       const sources = await client.fetchSources();
-      dispatch(newSources(sources));
+      dispatch(newGeneratedSources(sources));
     }
+    panel.emit("reloaded");
   };
 }

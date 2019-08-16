@@ -2,13 +2,46 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
+// @flow
+
 import { setupCommands, clientCommands } from "../commands";
 
 function makeThreadCLient(resp) {
-  return {
+  // Coerce this to any to avoid supplying the additional members needed in a
+  // thread client.
+  return ({
     pauseGrip: () => ({
       getPrototypeAndProperties: async () => resp
     })
+  }: any);
+}
+
+function makeDependencies() {
+  return {
+    debuggerClient: (null: any),
+    supportsWasm: true,
+    tabTarget: (null: any)
+  };
+}
+
+function makeGrip(actor = "") {
+  return {
+    actor,
+    class: "",
+    displayClass: "",
+    name: "",
+    extensible: true,
+    location: {
+      url: "",
+      line: 2,
+      column: 34
+    },
+    frozen: false,
+    ownPropertyLength: 1,
+    preview: {},
+    sealed: false,
+    optimizedOut: false,
+    type: ""
   };
 }
 
@@ -21,8 +54,8 @@ describe("firefox commands", () => {
         safeGetterValues: {}
       });
 
-      setupCommands({ threadClient });
-      const props = await getProperties({});
+      setupCommands({ ...makeDependencies(), threadClient });
+      const props = await getProperties("", makeGrip());
       expect(props).toMatchSnapshot();
     });
 
@@ -36,8 +69,8 @@ describe("firefox commands", () => {
         safeGetterValues: {}
       });
 
-      setupCommands({ threadClient });
-      const props = await getProperties({});
+      setupCommands({ ...makeDependencies(), threadClient });
+      const props = await getProperties("", makeGrip());
       expect(props).toMatchSnapshot();
     });
 
@@ -53,8 +86,8 @@ describe("firefox commands", () => {
         }
       });
 
-      setupCommands({ threadClient });
-      const props = await getProperties({});
+      setupCommands({ ...makeDependencies(), threadClient });
+      const props = await getProperties("", makeGrip());
       expect(props).toMatchSnapshot();
     });
 
@@ -69,8 +102,8 @@ describe("firefox commands", () => {
         }
       });
 
-      setupCommands({ threadClient });
-      const props = await getProperties({});
+      setupCommands({ ...makeDependencies(), threadClient });
+      const props = await getProperties("", makeGrip());
       expect(props).toMatchSnapshot();
     });
   });

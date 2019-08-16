@@ -8,6 +8,7 @@ var fs = require("fs");
 var fsExtra = require("fs-extra");
 const rimraf = require("rimraf");
 const shell = require("shelljs");
+const {sortBy} = require("lodash");
 
 const feature = require("devtools-config");
 const getConfig = require("./getConfig");
@@ -16,6 +17,25 @@ const writeReadme = require("./writeReadme");
 const envConfig = getConfig();
 feature.setConfig(envConfig);
 
+
+const moz_build_tpl = `
+# -*- Mode: python; indent-tabs-mode: nil; tab-width: 40 -*-
+# vim: set filetype=python:
+# This Source Code Form is subject to the terms of the Mozilla Public
+# License, v. 2.0. If a copy of the MPL was not distributed with this
+# file, You can obtain one at http://mozilla.org/MPL/2.0/.
+
+__dirs__
+
+DevToolsModules(
+__FILES__
+)
+`
+
+function exec(cmd) {
+  return shell.exec(cmd, {silent: true});
+}
+
 function moveFile(src, dest, opts) {
   if (!fs.existsSync(src)) {
     return;
@@ -23,11 +43,6 @@ function moveFile(src, dest, opts) {
 
   copyFile(src, dest, opts);
   rimraf.sync(src);
-}
-
-function updateFile(filename, cbk) {
-  var text = fs.readFileSync(filename, "utf-8");
-  fs.writeFileSync(filename, cbk(text), "utf-8");
 }
 
 function searchText(text, regexp) {
@@ -63,55 +78,18 @@ function copySVGs({ projectPath, mcPath }) {
    * and include them in the jar.mn file
    */
 
-  const projectImagesPath = path.join(projectPath, "assets/images/");
+  const projectImagesPath = path.join(projectPath, "/images/");
   const mcImagesPath = path.join(
     mcPath,
-    "devtools/client/themes/images/debugger"
+    "devtools/client/debugger/images"
   );
-
-  let usedSvgs = [];
-  const svgTest = new RegExp(/url\(\/images\/(.*)\)/, "g");
-  const cssFiles = walkSync(path.join(projectPath, "src/components"))
-    .filter(file => file.match(/css$/))
-    .forEach(file =>
-      usedSvgs.push(...searchText(fs.readFileSync(file, "utf-8"), svgTest))
-    );
-
-  const files = fs
-    .readdirSync(projectImagesPath)
-    .filter(file => file.match(/svg$/))
-    .filter(file => usedSvgs.includes(file));
-
-  rimraf.sync(mcImagesPath);
-  files.forEach(file =>
-    fsExtra.copySync(
-      path.join(projectImagesPath, file),
-      path.join(mcImagesPath, `${file}`)
-    )
-  );
-
-  const newText =
-    files
-      .map(
-        file =>
-          `    skin/images/debugger/${file} (themes/images/debugger/${file})`
-      )
-      .join("\n") + "\n";
-
-  const mcJarPath = path.join(mcPath, "devtools/client/jar.mn");
-  updateFile(mcJarPath, text => {
-    const newJar = text.replace(
-      /(.*skin\/images\/debugger\/.*$\n)+/gm,
-      newText
-    );
-    return newJar;
-  });
+  fsExtra.copySync(projectImagesPath, mcImagesPath);
 }
 
 function copyTests({ mcPath, projectPath, mcModulePath, shouldSymLink }) {
   console.log("[copy-assets] copy tests");
 
-  const projectTestPath = path.join(projectPath, "src/test/mochitest");
+  const projectTestPath = path.join(projectPath, "test/mochitest");
   const mcTestPath = path.join(mcPath, mcModulePath, "test/mochitest");
   if (shouldSymLink) {
     symlinkTests({ projectPath, mcTestPath, projectTestPath });
@@ -163,11 +141,38 @@ function copyWasmParser({ mcPath, projectPath }) {
   );
 }
 
+// searches the git branches for the last release branch
+function lastRelease() {
+  const {stdout: branches} = exec(`git branch -a | grep 'origin/release'`)
+  const releases = branches.
+    split("\n")
+    .map(b => b.replace(/remotes\/origin\//, '').trim())
+    .filter(b => b.match(/^release-(\d+)$/))
+
+  const ordered = sortBy(releases, r => parseInt(/\d+/.exec(r)[0], 10)  )
+  return ordered[ordered.length -1];
+}
+
+// updates the assets manifest with the latest release manifest
+// so that webpack bundles remain largely the same
+function updateManifest() {
+  const {stdout: branch} = exec(`git rev-parse --abbrev-ref HEAD`)
+
+  if (!branch.includes("release")) {
+    return;
+  }
+
+  console.log("[copy-assets] update assets manifest");
+
+  const last = lastRelease();
+  exec(`git cat-file -p ${last}:assets/module-manifest.json > assets/module-manifest.json`);
+}
+
 function start() {
   console.log("[copy-assets] start");
 
   const projectPath = path.resolve(__dirname, "..");
-  const mcModulePath = "devtools/client/debugger/new";
+  const mcModulePath = "devtools/client/debugger";
 
   process.env.NODE_ENV = "production";
 
@@ -195,24 +200,25 @@ function start() {
   console.log("[copy-assets] - index.html, index.js");
   copyFile(
     path.join(projectPath, "./assets/panel/index.html"),
-    path.join(mcPath, "devtools/client/debugger/new/index.html"),
+    path.join(mcPath, "devtools/client/debugger/index.html"),
     { cwd: projectPath }
   );
   copyFile(
     path.join(projectPath, "./assets/panel/panel.js"),
-    path.join(mcPath, "devtools/client/debugger/new/panel.js"),
+    path.join(mcPath, "devtools/client/debugger/panel.js"),
     { cwd: projectPath }
   );
 
   console.log("[copy-assets] - moz.build");
   copyFile(
     path.join(projectPath, "./assets/panel/moz.build"),
-    path.join(mcPath, "devtools/client/debugger/new/moz.build"),
+    path.join(mcPath, "devtools/client/debugger/moz.build"),
     { cwd: projectPath }
   );
 
+
   // Ensure /dist path exists.
-  const bundlePath = "devtools/client/debugger/new/dist";
+  const bundlePath = "devtools/client/debugger/dist";
   shell.mkdir("-p", path.join(mcPath, bundlePath));
 
   console.log("[copy-assets] - dist/moz.build");
@@ -225,17 +231,9 @@ function start() {
   copySVGs(config);
   copyTests(config);
   copyWasmParser(config);
-  writeReadme(path.join(mcPath, "devtools/client/debugger/new/README.mozilla"));
+  writeReadme(path.join(mcPath, "devtools/client/debugger/README.mozilla"));
 
-  const debuggerPath = "devtools/client/debugger/new"
-
-  if (!mcPath.startsWith(projectPath)) {
-    rimraf.sync(path.join(
-      mcPath,
-      debuggerPath,
-      "test/mochitest/examples/babel/source-maps-semantics.md"
-    ));
-  }
+  const debuggerPath = "devtools/client/debugger"
 
   console.log("[copy-assets] make webpack bundles");
   return makeBundle({

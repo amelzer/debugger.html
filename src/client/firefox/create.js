@@ -5,61 +5,59 @@
 // @flow
 // This module converts Firefox specific types to the generic types
 
-import type { Frame, Source, Location } from "../../types";
+import type { Frame, ThreadId, GeneratedSourceData } from "../../types";
 import type {
   PausedPacket,
   FramesResponse,
   FramePacket,
-  SourcePayload
+  SourcePayload,
+  ThreadClient
 } from "./types";
 
-export function createFrame(frame: FramePacket): ?Frame {
+import { clientCommands } from "./commands";
+
+export function prepareSourcePayload(
+  client: ThreadClient,
+  source: SourcePayload
+): GeneratedSourceData {
+  // We populate the set of sources as soon as we hear about them. Note that
+  // this means that we have seen an actor, but it might still be in the
+  // debounced queue for creation, so the Redux store itself might not have
+  // a source actor with this ID yet.
+  clientCommands.registerSourceActor(source.actor, makeSourceId(source));
+
+  return { thread: client.actor, source };
+}
+
+export function createFrame(thread: ThreadId, frame: FramePacket): ?Frame {
   if (!frame) {
     return null;
   }
-  let title;
-  if (frame.type == "call") {
-    const c = frame.callee;
-    title = c.name || c.userDisplayName || c.displayName;
-  } else {
-    title = `(${frame.type})`;
-  }
+
   const location = {
-    sourceId: frame.where.source.actor,
+    sourceId: clientCommands.getSourceForActor(frame.where.actor),
     line: frame.where.line,
     column: frame.where.column
   };
 
   return {
     id: frame.actor,
-    displayName: title,
+    thread,
+    displayName: frame.displayName,
     location,
     generatedLocation: location,
     this: frame.this,
+    source: null,
     scope: frame.environment
   };
 }
 
-export function createSource(
-  source: SourcePayload,
-  { supportsWasm }: { supportsWasm: boolean }
-): Source {
-  const createdSource = {
-    id: source.actor,
-    url: source.url,
-    relativeUrl: source.url,
-    isPrettyPrinted: false,
-    isWasm: false,
-    sourceMapURL: source.sourceMapURL,
-    isBlackBoxed: false,
-    loadedState: "unloaded"
-  };
-  return Object.assign(createdSource, {
-    isWasm: supportsWasm && source.introductionType === "wasm"
-  });
+export function makeSourceId(source: SourcePayload) {
+  return source.url ? `sourceURL-${source.url}` : `source-${source.actor}`;
 }
 
 export function createPause(
+  thread: string,
   packet: PausedPacket,
   response: FramesResponse
 ): any {
@@ -68,27 +66,18 @@ export function createPause(
 
   return {
     ...packet,
-    frame: createFrame(frame),
-    frames: response.frames.map(createFrame)
+    thread,
+    frame: createFrame(thread, frame),
+    frames: response.frames.map(createFrame.bind(null, thread))
   };
 }
 
-// Firefox only returns `actualLocation` if it actually changed,
-// but we want it always to exist. Format `actualLocation` if it
-// exists, otherwise use `location`.
-
-export function createBreakpointLocation(
-  location: Location,
-  actualLocation?: Object
-): Location {
-  if (!actualLocation) {
-    return location;
-  }
-
+export function createWorker(actor: string, url: string) {
   return {
-    sourceId: actualLocation.source.actor,
-    sourceUrl: actualLocation.source.url,
-    line: actualLocation.line,
-    column: actualLocation.column
+    actor,
+    url,
+    // Ci.nsIWorkerDebugger.TYPE_DEDICATED
+    type: 0,
+    name: ""
   };
 }

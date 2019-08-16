@@ -3,30 +3,31 @@
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
 // @flow
-import { Component } from "react";
+import { PureComponent } from "react";
 import {
   toEditorPosition,
   getDocument,
   hasDocument,
   startOperation,
-  endOperation
+  endOperation,
+  getTokenEnd
 } from "../../utils/editor";
-import { isLoaded } from "../../utils/source";
 import { isException } from "../../utils/pause";
 import { getIndentation } from "../../utils/indentation";
-import { connect } from "react-redux";
+import { connect } from "../../utils/connect";
 import {
   getVisibleSelectedFrame,
   getPauseReason,
-  getSelectedSource
+  getSourceWithContent,
+  getCurrentThread
 } from "../../selectors";
 
-import type { Frame, Why, Source } from "../../types";
+import type { Frame, Why, SourceWithContent } from "../../types";
 
 type Props = {
-  selectedFrame: Frame,
+  frame: Frame,
   why: Why,
-  selectedSource: Source
+  source: ?SourceWithContent
 };
 
 type TextClasses = {
@@ -34,58 +35,61 @@ type TextClasses = {
   lineClass: string
 };
 
-function isDocumentReady(selectedSource, selectedFrame) {
+function isDocumentReady(source: ?SourceWithContent, frame) {
   return (
-    selectedFrame &&
-    isLoaded(selectedSource) &&
-    hasDocument(selectedFrame.location.sourceId)
+    frame && source && source.content && hasDocument(frame.location.sourceId)
   );
 }
 
-export class DebugLine extends Component<Props> {
+export class DebugLine extends PureComponent<Props> {
   debugExpression: null;
 
+  componentDidMount() {
+    const { why, frame, source } = this.props;
+    this.setDebugLine(why, frame, source);
+  }
+
+  componentWillUnmount() {
+    const { why, frame, source } = this.props;
+    this.clearDebugLine(why, frame, source);
+  }
+
   componentDidUpdate(prevProps: Props) {
-    const { why, selectedFrame, selectedSource } = this.props;
+    const { why, frame, source } = this.props;
 
     startOperation();
-    this.clearDebugLine(
-      prevProps.selectedFrame,
-      prevProps.selectedSource,
-      prevProps.why
-    );
-    this.setDebugLine(why, selectedFrame, selectedSource);
+    this.clearDebugLine(prevProps.why, prevProps.frame, prevProps.source);
+    this.setDebugLine(why, frame, source);
     endOperation();
   }
 
-  componentDidMount() {
-    const { why, selectedFrame, selectedSource } = this.props;
-    this.setDebugLine(why, selectedFrame, selectedSource);
-  }
-
-  setDebugLine(why: Why, selectedFrame: Frame, selectedSource: Source) {
-    if (!isDocumentReady(selectedSource, selectedFrame)) {
+  setDebugLine(why: Why, frame: Frame, source: ?SourceWithContent) {
+    if (!isDocumentReady(source, frame)) {
       return;
     }
-    const sourceId = selectedFrame.location.sourceId;
+    const sourceId = frame.location.sourceId;
     const doc = getDocument(sourceId);
 
-    let { line, column } = toEditorPosition(selectedFrame.location);
+    let { line, column } = toEditorPosition(frame.location);
     const { markTextClass, lineClass } = this.getTextClasses(why);
     doc.addLineClass(line, "line", lineClass);
 
     const lineText = doc.getLine(line);
     column = Math.max(column, getIndentation(lineText));
 
+    // If component updates because user clicks on
+    // another source tab, codeMirror will be null.
+    const columnEnd = doc.cm ? getTokenEnd(doc.cm, line, column) : null;
+
     this.debugExpression = doc.markText(
       { ch: column, line },
-      { ch: null, line },
+      { ch: columnEnd, line },
       { className: markTextClass }
     );
   }
 
-  clearDebugLine(selectedFrame: Frame, selectedSource: Source, why: Why) {
-    if (!isDocumentReady(selectedSource, selectedFrame)) {
+  clearDebugLine(why: Why, frame: Frame, source: ?SourceWithContent) {
+    if (!isDocumentReady(source, frame)) {
       return;
     }
 
@@ -93,8 +97,8 @@ export class DebugLine extends Component<Props> {
       this.debugExpression.clear();
     }
 
-    const sourceId = selectedFrame.location.sourceId;
-    const { line } = toEditorPosition(selectedFrame.location);
+    const sourceId = frame.location.sourceId;
+    const { line } = toEditorPosition(frame.location);
     const doc = getDocument(sourceId);
     const { lineClass } = this.getTextClasses(why);
     doc.removeLineClass(line, "line", lineClass);
@@ -116,10 +120,13 @@ export class DebugLine extends Component<Props> {
   }
 }
 
-const mapStateToProps = state => ({
-  selectedFrame: getVisibleSelectedFrame(state),
-  selectedSource: getSelectedSource(state),
-  why: getPauseReason(state)
-});
+const mapStateToProps = state => {
+  const frame = getVisibleSelectedFrame(state);
+  return {
+    frame,
+    source: frame && getSourceWithContent(state, frame.location.sourceId),
+    why: getPauseReason(state, getCurrentThread(state))
+  };
+};
 
 export default connect(mapStateToProps)(DebugLine);

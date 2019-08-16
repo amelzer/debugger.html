@@ -2,26 +2,40 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
+// @flow
+
 import React from "react";
 import { shallow } from "enzyme";
 import Group from "../Group.js";
+import {
+  makeMockFrame,
+  makeMockSource,
+  mockthreadcx
+} from "../../../../utils/test-mockup";
 
 import FrameMenu from "../FrameMenu";
 jest.mock("../FrameMenu", () => jest.fn());
 
 function render(overrides = {}) {
+  const frame = { ...makeMockFrame(), displayName: "foo", library: "Back" };
   const defaultProps = {
-    group: [{ displayName: "foo" }],
-    selectedFrame: {},
+    cx: mockthreadcx,
+    group: [frame],
+    selectedFrame: frame,
     frameworkGroupingOn: true,
     toggleFrameworkGrouping: jest.fn(),
     selectFrame: jest.fn(),
     copyStackTrace: jest.fn(),
-    toggleBlackBox: jest.fn()
+    toggleBlackBox: jest.fn(),
+    disableContextMenu: false,
+    displayFullUrl: false,
+    selectable: true
   };
 
   const props = { ...defaultProps, ...overrides };
-  const component = shallow(<Group {...props} />);
+  const component = shallow(<Group {...props} />, {
+    context: { l10n: L10N }
+  });
   return { component, props };
 }
 
@@ -32,38 +46,20 @@ describe("Group", () => {
   });
 
   it("passes the getFrameTitle prop to the Frame components", () => {
+    const mahscripts = makeMockSource("http://myfile.com/mahscripts.js");
+    const back = makeMockSource("http://myfile.com/back.js");
     const group = [
       {
-        id: 1,
-        displayName: "renderFoo",
-        location: {
-          line: 55
-        },
-        source: {
-          url: "http://myfile.com/mahscripts.js"
-        }
+        ...makeMockFrame("1", mahscripts, undefined, 55, "renderFoo"),
+        library: "Back"
       },
       {
-        id: 2,
-        library: "back",
-        displayName: "a",
-        location: {
-          line: 55
-        },
-        source: {
-          url: "http://myfile.com/back.js"
-        }
+        ...makeMockFrame("2", back, undefined, 55, "a"),
+        library: "Back"
       },
       {
-        id: 3,
-        library: "back",
-        displayName: "b",
-        location: {
-          line: 55
-        },
-        source: {
-          url: "http://myfile.com/back.js"
-        }
+        ...makeMockFrame("3", back, undefined, 55, "b"),
+        library: "Back"
       }
     ];
     const getFrameTitle = () => {};
@@ -71,7 +67,7 @@ describe("Group", () => {
 
     component.setState({ expanded: true });
 
-    const frameComponents = component.find("FrameComponent");
+    const frameComponents = component.find("Frame");
     expect(frameComponents).toHaveLength(3);
     frameComponents.forEach(node => {
       expect(node.prop("getFrameTitle")).toBe(getFrameTitle);
@@ -79,7 +75,42 @@ describe("Group", () => {
     expect(component).toMatchSnapshot();
   });
 
+  it("renders group with anonymous functions", () => {
+    const mahscripts = makeMockSource("http://myfile.com/mahscripts.js");
+    const back = makeMockSource("http://myfile.com/back.js");
+    const group = [
+      {
+        ...makeMockFrame("1", mahscripts, undefined, 55),
+        library: "Back"
+      },
+      {
+        ...makeMockFrame("2", back, undefined, 55),
+        library: "Back"
+      },
+      {
+        ...makeMockFrame("3", back, undefined, 55),
+        library: "Back"
+      }
+    ];
+
+    const { component } = render({ group });
+    expect(component).toMatchSnapshot();
+    component.setState({ expanded: true });
+    expect(component).toMatchSnapshot();
+  });
+
   describe("mouse events", () => {
+    it("does not call FrameMenu when disableContextMenu is true", () => {
+      const { component } = render({
+        disableContextMenu: true
+      });
+
+      const mockEvent = "mockEvent";
+      component.simulate("contextmenu", mockEvent);
+
+      expect(FrameMenu).toHaveBeenCalledTimes(0);
+    });
+
     it("calls FrameMenu on right click", () => {
       const { component, props } = render();
       const { copyStackTrace, toggleFrameworkGrouping, toggleBlackBox } = props;

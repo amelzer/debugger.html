@@ -2,21 +2,25 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
-import { createSource } from "../../../reducers/sources";
+// @flow
+
+import { makeMockSource } from "../../../utils/test-mockup";
 
 import { getDirectories, createTree } from "../index";
 
-function formatDirectories(source, parentMap, tree) {
-  const paths = getDirectories(source, parentMap, tree);
+function formatDirectories(source, tree) {
+  const paths: any = getDirectories(source, tree);
   return paths.map(node => node.path);
 }
 
 function createSources(urls) {
-  return urls.reduce((sources, url, index) => {
-    const id = `a${index}`;
-    sources[id] = createSource({ url, id });
-    return sources;
-  }, {});
+  return {
+    FakeThread: urls.reduce((sources, url, index) => {
+      const id = `a${index}`;
+      sources[id] = makeMockSource(url, id);
+      return sources;
+    }, {})
+  };
 }
 
 describe("getDirectories", () => {
@@ -27,19 +31,36 @@ describe("getDirectories", () => {
       "http://b/c.js"
     ]);
 
+    const threads = [
+      {
+        actor: "FakeThread",
+        url: "http://a",
+        type: 1,
+        name: "FakeThread"
+      }
+    ];
+
     const debuggeeUrl = "http://a/";
-    const { sourceTree, parentMap } = createTree({ sources, debuggeeUrl });
-    expect(formatDirectories(sources.a0, parentMap, sourceTree)).toEqual([
-      "a/b.js",
-      "a"
+    const { sourceTree } = createTree({
+      sources,
+      debuggeeUrl,
+      threads
+    });
+
+    expect(formatDirectories(sources.FakeThread.a0, sourceTree)).toEqual([
+      "FakeThread/a/b.js",
+      "FakeThread/a",
+      "FakeThread"
     ]);
-    expect(formatDirectories(sources.a1, parentMap, sourceTree)).toEqual([
-      "a/c.js",
-      "a"
+    expect(formatDirectories(sources.FakeThread.a1, sourceTree)).toEqual([
+      "FakeThread/a/c.js",
+      "FakeThread/a",
+      "FakeThread"
     ]);
-    expect(formatDirectories(sources.a2, parentMap, sourceTree)).toEqual([
-      "b/c.js",
-      "b"
+    expect(formatDirectories(sources.FakeThread.a2, sourceTree)).toEqual([
+      "FakeThread/b/c.js",
+      "FakeThread/b",
+      "FakeThread"
     ]);
   });
 });

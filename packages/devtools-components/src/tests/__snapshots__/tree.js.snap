@@ -1,5 +1,285 @@
 // Jest Snapshot v1, https://goo.gl/fbAQLP
 
+exports[`Tree Don't auto expand root with very large number of children 1`] = `
+Array [
+  "key-A",
+  "key-B",
+  "key-E",
+  "key-F",
+  "key-G",
+  "key-C",
+  "key-H",
+  "key-I",
+  "key-D",
+  "key-J",
+  "key-M",
+  "key-N",
+]
+`;
+
+exports[`Tree active item - focus is inside the tree node and then blur 1`] = `
+"
+▼ A
+|  ▼ B
+|  |  ▼ E
+|  |  |    K
+|  |  |    [L anchor]
+|  |    F
+|  |    G
+|  ▼ C
+|  |    H
+|  |    I
+|  ▼ D
+|  |    J
+▼ M
+|  ▼ N
+|  |    O
+"
+`;
+
+exports[`Tree active item - focus is inside the tree node when possible 1`] = `
+"
+▼ A
+|  ▼ B
+|  |  ▼ E
+|  |  |    K
+|  |  |    [L anchor]
+|  |    F
+|  |    G
+|  ▼ C
+|  |    H
+|  |    I
+|  ▼ D
+|  |    J
+▼ M
+|  ▼ N
+|  |    O
+"
+`;
+
+exports[`Tree active item - focus is inside the tree node when possible 2`] = `
+"
+▼ A
+|  ▼ B
+|  |  ▼ E
+|  |  |    K
+|  |  |    [L anchor]
+|  |    F
+|  |    G
+|  ▼ C
+|  |    H
+|  |    I
+|  ▼ D
+|  |    J
+▼ M
+|  ▼ N
+|  |    O
+"
+`;
+
+exports[`Tree active item - navigate inside the tree node 1`] = `
+"
+▼ A
+|  ▼ B
+|  |  ▼ E
+|  |  |    K
+|  |  |    [L anchor]
+|  |    F
+|  |    G
+|  ▼ C
+|  |    H
+|  |    I
+|  ▼ D
+|  |    J
+▼ M
+|  ▼ N
+|  |    O
+"
+`;
+
+exports[`Tree active item - navigate inside the tree node 2`] = `
+"
+▼ A
+|  ▼ B
+|  |  ▼ E
+|  |  |    K
+|  |  |    [L anchor]
+|  |    F
+|  |    G
+|  ▼ C
+|  |    H
+|  |    I
+|  ▼ D
+|  |    J
+▼ M
+|  ▼ N
+|  |    O
+"
+`;
+
+exports[`Tree active item - navigate inside the tree node 3`] = `
+"
+▼ A
+|  ▼ B
+|  |  ▼ E
+|  |  |    K
+|  |  |    [L anchor]
+|  |    F
+|  |    G
+|  ▼ C
+|  |    H
+|  |    I
+|  ▼ D
+|  |    J
+▼ M
+|  ▼ N
+|  |    O
+"
+`;
+
+exports[`Tree active item - renders as expected when clicking away 1`] = `
+"
+▼ A
+|  ▼ B
+|  |  ▼ E
+|  |  |    K
+|  |  |    L
+|  |    F
+|  |    [G]
+|  ▼ C
+|  |    H
+|  |    I
+|  ▼ D
+|  |    J
+▼ M
+|  ▼ N
+|  |    O
+"
+`;
+
+exports[`Tree active item - renders as expected when clicking away 2`] = `
+"
+▶︎ [A]
+▼ M
+|  ▼ N
+|  |    O
+"
+`;
+
+exports[`Tree active item - renders as expected when moving away with keyboard 1`] = `
+"
+▼ A
+|  ▼ B
+|  |  ▼ E
+|  |  |    K
+|  |  |    [L]
+|  |    F
+|  |    G
+|  ▼ C
+|  |    H
+|  |    I
+|  ▼ D
+|  |    J
+▼ M
+|  ▼ N
+|  |    O
+"
+`;
+
+exports[`Tree active item - renders as expected when tree blurs 1`] = `
+"
+▼ A
+|  ▼ B
+|  |  ▼ E
+|  |  |    K
+|  |  |    L
+|  |    F
+|  |    [G]
+|  ▼ C
+|  |    H
+|  |    I
+|  ▼ D
+|  |    J
+▼ M
+|  ▼ N
+|  |    O
+"
+`;
+
+exports[`Tree active item - renders as expected when tree blurs 2`] = `
+"
+▼ A
+|  ▼ B
+|  |  ▼ E
+|  |  |    K
+|  |  |    L
+|  |    F
+|  |    [G]
+|  ▼ C
+|  |    H
+|  |    I
+|  ▼ D
+|  |    J
+▼ M
+|  ▼ N
+|  |    O
+"
+`;
+
+exports[`Tree active item - renders as expected when using keyboard and Enter 1`] = `
+"
+▼ A
+|  ▼ B
+|  |  ▼ E
+|  |  |    K
+|  |  |    [L]
+|  |    F
+|  |    G
+|  ▼ C
+|  |    H
+|  |    I
+|  ▼ D
+|  |    J
+▼ M
+|  ▼ N
+|  |    O
+"
+`;
+
+exports[`Tree active item - renders as expected when using keyboard and Space 1`] = `
+"
+▼ A
+|  ▼ B
+|  |  ▼ E
+|  |  |    K
+|  |  |    [L]
+|  |    F
+|  |    G
+|  ▼ C
+|  |    H
+|  |    I
+|  ▼ D
+|  |    J
+▼ M
+|  ▼ N
+|  |    O
+"
+`;
+
+exports[`Tree calls shouldItemUpdate when provided 1`] = `
+"
+▶︎ A
+▶︎ M
+"
+`;
+
+exports[`Tree calls shouldItemUpdate when provided 2`] = `
+"
+▶︎ A
+▶︎ M
+"
+`;
+
 exports[`Tree ignores key strokes when pressing modifiers 1`] = `
 "
 ▼ A

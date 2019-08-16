@@ -3,6 +3,7 @@
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
 // @flow
+// eslint-disable-next-line import/named
 import { objectInspector } from "devtools-reps";
 import { getBindingVariables } from "./getVariables";
 import { getFramePopVariables, getThisVariable } from "./utils";
@@ -83,7 +84,7 @@ export function getScope(
     }
 
     if (vars && vars.length) {
-      const title = getScopeTitle(type, scope);
+      const title = getScopeTitle(type, scope) || "";
       vars.sort((a, b) => a.name.localeCompare(b.name));
       return {
         name: title,

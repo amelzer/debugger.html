@@ -20,9 +20,11 @@ function mountTree(overrides = {}) {
           super(props);
           const state = {
             expanded: overrides.expanded || new Set(),
-            focused: overrides.focused
+            focused: overrides.focused,
+            active: overrides.active
           };
           delete overrides.focused;
+          delete overrides.active;
           this.state = state;
         }
 
@@ -49,6 +51,11 @@ function mountTree(overrides = {}) {
                     return { focused: x };
                   });
                 },
+                onActivate: x => {
+                  this.setState(previousState => {
+                    return { active: x };
+                  });
+                },
                 onExpand: x => {
                   this.setState(previousState => {
                     const expanded = new Set(previousState.expanded);
@@ -64,7 +71,8 @@ function mountTree(overrides = {}) {
                   });
                 },
                 isExpanded: x => this.state && this.state.expanded.has(x),
-                focused: this.state.focused
+                focused: this.state.focused,
+                active: this.state.active
               },
               overrides
             )
@@ -78,6 +86,27 @@ function mountTree(overrides = {}) {
 describe("Tree", () => {
   it("does not throw", () => {
     expect(mountTree()).toBeTruthy();
+  });
+
+  it("Don't auto expand root with very large number of children", () => {
+    const children = Array.from(
+      { length: 51 },
+      (_, i) => `should-not-be-visible-${i + 1}`
+    );
+    // N has a lot of children, so it won't be automatically expanded
+    const wrapper = mountTree({
+      autoExpandDepth: 2,
+      autoExpandNodeChildrenLimit: 50,
+      getChildren: item => {
+        if (item === "N") {
+          return children;
+        }
+
+        return TEST_TREE.children[item] || [];
+      }
+    });
+    const ids = getTreeNodes(wrapper).map(node => node.prop("id"));
+    expect(ids).toMatchSnapshot();
   });
 
   it("is accessible", () => {
@@ -172,6 +201,184 @@ describe("Tree", () => {
       autoExpandDepth: 1
     });
     expect(formatTree(wrapper)).toMatchSnapshot();
+  });
+
+  it("calls shouldItemUpdate when provided", () => {
+    const shouldItemUpdate = jest.fn((prev, next) => true);
+    const wrapper = mountTree({
+      shouldItemUpdate
+    });
+    expect(formatTree(wrapper)).toMatchSnapshot();
+    expect(shouldItemUpdate.mock.calls).toHaveLength(0);
+
+    wrapper
+      .find("Tree")
+      .first()
+      .instance()
+      .forceUpdate();
+    expect(formatTree(wrapper)).toMatchSnapshot();
+    expect(shouldItemUpdate.mock.calls).toHaveLength(2);
+
+    expect(shouldItemUpdate.mock.calls[0][0]).toBe("A");
+    expect(shouldItemUpdate.mock.calls[0][1]).toBe("A");
+    expect(shouldItemUpdate.mock.results[0].value).toBe(true);
+    expect(shouldItemUpdate.mock.calls[1][0]).toBe("M");
+    expect(shouldItemUpdate.mock.calls[1][1]).toBe("M");
+    expect(shouldItemUpdate.mock.results[1].value).toBe(true);
+  });
+
+  it("active item - renders as expected when clicking away", () => {
+    const wrapper = mountTree({
+      expanded: new Set("ABCDEFGHIJKLMNO".split("")),
+      focused: "G",
+      active: "G"
+    });
+    expect(formatTree(wrapper)).toMatchSnapshot();
+    expect(wrapper.find(".active").prop("id")).toBe("key-G");
+
+    getTreeNodes(wrapper)
+      .first()
+      .simulate("click");
+    expect(formatTree(wrapper)).toMatchSnapshot();
+    expect(wrapper.find(".focused").prop("id")).toBe("key-A");
+    expect(wrapper.find(".active").exists()).toBe(false);
+  });
+
+  it("active item - renders as expected when tree blurs", () => {
+    const wrapper = mountTree({
+      expanded: new Set("ABCDEFGHIJKLMNO".split("")),
+      focused: "G",
+      active: "G"
+    });
+    expect(formatTree(wrapper)).toMatchSnapshot();
+    expect(wrapper.find(".active").prop("id")).toBe("key-G");
+
+    wrapper.simulate("blur");
+    expect(formatTree(wrapper)).toMatchSnapshot();
+    expect(wrapper.find(".active").exists()).toBe(false);
+  });
+
+  it("active item - renders as expected when moving away with keyboard", () => {
+    const wrapper = mountTree({
+      expanded: new Set("ABCDEFGHIJKLMNO".split("")),
+      focused: "L",
+      active: "L"
+    });
+    expect(formatTree(wrapper)).toMatchSnapshot();
+    expect(wrapper.find(".active").prop("id")).toBe("key-L");
+
+    simulateKeyDown(wrapper, "ArrowUp");
+    expect(wrapper.find(".active").exists()).toBe(false);
+  });
+
+  it("active item - renders as expected when using keyboard and Enter", () => {
+    const wrapper = mountTree({
+      expanded: new Set("ABCDEFGHIJKLMNO".split("")),
+      focused: "L"
+    });
+    wrapper.getDOMNode().focus();
+    expect(formatTree(wrapper)).toMatchSnapshot();
+    expect(wrapper.find(".active").exists()).toBe(false);
+
+    simulateKeyDown(wrapper, "Enter");
+    expect(wrapper.find(".active").prop("id")).toBe("key-L");
+
+    expect(wrapper.getDOMNode().ownerDocument.activeElement).toBe(
+      wrapper.getDOMNode()
+    );
+
+    simulateKeyDown(wrapper, "Escape");
+    expect(wrapper.find(".active").exists()).toBe(false);
+    expect(wrapper.getDOMNode().ownerDocument.activeElement).toBe(
+      wrapper.getDOMNode()
+    );
+  });
+
+  it("active item - renders as expected when using keyboard and Space", () => {
+    const wrapper = mountTree({
+      expanded: new Set("ABCDEFGHIJKLMNO".split("")),
+      focused: "L"
+    });
+    wrapper.getDOMNode().focus();
+    expect(formatTree(wrapper)).toMatchSnapshot();
+    expect(wrapper.find(".active").exists()).toBe(false);
+
+    simulateKeyDown(wrapper, " ");
+    expect(wrapper.find(".active").prop("id")).toBe("key-L");
+
+    simulateKeyDown(wrapper, "Escape");
+    expect(wrapper.find(".active").exists()).toBe(false);
+  });
+
+  it("active item - focus is inside the tree node when possible", () => {
+    const wrapper = mountTree({
+      expanded: new Set("ABCDEFGHIJKLMNO".split("")),
+      focused: "L",
+      renderItem: renderItemWithFocusableContent
+    });
+    wrapper.getDOMNode().focus();
+    expect(formatTree(wrapper)).toMatchSnapshot();
+    expect(wrapper.find(".active").exists()).toBe(false);
+    expect(wrapper.getDOMNode().ownerDocument.activeElement).toBe(
+      wrapper.getDOMNode()
+    );
+
+    simulateKeyDown(wrapper, "Enter");
+    expect(wrapper.find(".active").prop("id")).toBe("key-L");
+    expect(formatTree(wrapper)).toMatchSnapshot();
+    expect(wrapper.getDOMNode().ownerDocument.activeElement).toBe(
+      wrapper.find("#active-anchor").getDOMNode()
+    );
+  });
+
+  it("active item - navigate inside the tree node", () => {
+    const wrapper = mountTree({
+      expanded: new Set("ABCDEFGHIJKLMNO".split("")),
+      focused: "L",
+      renderItem: renderItemWithFocusableContent
+    });
+    wrapper.getDOMNode().focus();
+    simulateKeyDown(wrapper, "Enter");
+    expect(formatTree(wrapper)).toMatchSnapshot();
+    expect(wrapper.find(".active").prop("id")).toBe("key-L");
+    expect(wrapper.getDOMNode().ownerDocument.activeElement).toBe(
+      wrapper.find("#active-anchor").getDOMNode()
+    );
+
+    simulateKeyDown(wrapper, "Tab");
+    expect(formatTree(wrapper)).toMatchSnapshot();
+    expect(wrapper.find(".active").prop("id")).toBe("key-L");
+    expect(wrapper.getDOMNode().ownerDocument.activeElement).toBe(
+      wrapper.find("#active-anchor").getDOMNode()
+    );
+
+    simulateKeyDown(wrapper, "Tab", { shiftKey: true });
+    expect(formatTree(wrapper)).toMatchSnapshot();
+    expect(wrapper.find(".active").prop("id")).toBe("key-L");
+    expect(wrapper.getDOMNode().ownerDocument.activeElement).toBe(
+      wrapper.find("#active-anchor").getDOMNode()
+    );
+  });
+
+  it("active item - focus is inside the tree node and then blur", () => {
+    const wrapper = mountTree({
+      expanded: new Set("ABCDEFGHIJKLMNO".split("")),
+      focused: "L",
+      renderItem: renderItemWithFocusableContent
+    });
+    wrapper.getDOMNode().focus();
+    simulateKeyDown(wrapper, "Enter");
+    expect(formatTree(wrapper)).toMatchSnapshot();
+    expect(wrapper.find(".active").prop("id")).toBe("key-L");
+    expect(wrapper.getDOMNode().ownerDocument.activeElement).toBe(
+      wrapper.find("#active-anchor").getDOMNode()
+    );
+
+    wrapper.find("#active-anchor").simulate("blur");
+    expect(wrapper.find(".active").exists()).toBe(false);
+    expect(wrapper.getDOMNode().ownerDocument.activeElement).toBe(
+      wrapper.getDOMNode().ownerDocument.body
+    );
   });
 
   it("renders as expected when given a focused item", () => {
@@ -491,7 +698,7 @@ describe("Tree", () => {
     const treeRef = wrapper
       .find("Tree")
       .first()
-      .instance().treeRef;
+      .instance().treeRef.current;
     treeRef.focus = jest.fn();
 
     getTreeNodes(wrapper)
@@ -508,46 +715,10 @@ describe("Tree", () => {
     const treeRef = wrapper
       .find("Tree")
       .first()
-      .instance().treeRef;
+      .instance().treeRef.current;
     treeRef.focus = jest.fn();
     wrapper.simulate("blur");
     expect(treeRef.focus.mock.calls).toHaveLength(0);
-  });
-
-  it("calls onActivate when expected", () => {
-    const onActivate = jest.fn();
-
-    const wrapper = mountTree({
-      expanded: new Set("ABCDEFGHIJKLMNO".split("")),
-      focused: "A",
-      onActivate
-    });
-
-    simulateKeyDown(wrapper, "Enter");
-    expect(onActivate.mock.calls).toHaveLength(1);
-    expect(onActivate.mock.calls[0][0]).toBe("A");
-
-    simulateKeyDown(wrapper, "Enter");
-    expect(onActivate.mock.calls).toHaveLength(2);
-    expect(onActivate.mock.calls[1][0]).toBe("A");
-
-    simulateKeyDown(wrapper, "ArrowDown");
-    simulateKeyDown(wrapper, "Enter");
-    expect(onActivate.mock.calls).toHaveLength(3);
-    expect(onActivate.mock.calls[2][0]).toBe("B");
-
-    wrapper.simulate("blur");
-    simulateKeyDown(wrapper, "Enter");
-    expect(onActivate.mock.calls).toHaveLength(3);
-  });
-
-  it("does not throw when onActivate is undefined and Enter is pressed", () => {
-    const wrapper = mountTree({
-      expanded: new Set("ABCDEFGHIJKLMNO".split("")),
-      focused: "A"
-    });
-
-    simulateKeyDown(wrapper, "Enter");
   });
 
   it("ignores key strokes when pressing modifiers", () => {
@@ -593,9 +764,9 @@ describe("Tree", () => {
 
     getTreeNodes(wrapper).forEach(n => {
       if ("ABECDMN".split("").includes(getSanitizedNodeText(n))) {
-        expect(n.find("img.arrow.expanded").exists()).toBe(true);
+        expect(n.find(".arrow.expanded").exists()).toBe(true);
       } else {
-        expect(n.find("img.arrow").exists()).toBe(false);
+        expect(n.find(".arrow").exists()).toBe(false);
       }
     });
   });
@@ -605,7 +776,7 @@ describe("Tree", () => {
     expect(formatTree(wrapper)).toMatchSnapshot();
 
     getTreeNodes(wrapper).forEach(n => {
-      const arrow = n.find("img.arrow");
+      const arrow = n.find(".arrow");
       expect(arrow.exists()).toBe(true);
       expect(arrow.hasClass("expanded")).toBe(false);
     });
@@ -632,12 +803,26 @@ function getTreeNodes(wrapper) {
   return wrapper.find(".tree-node");
 }
 
-function simulateKeyDown(wrapper, key) {
+function simulateKeyDown(wrapper, key, options) {
   wrapper.simulate("keydown", {
     key,
     preventDefault: () => {},
-    stopPropagation: () => {}
+    stopPropagation: () => {},
+    ...options
   });
+}
+
+function renderItemWithFocusableContent(x, depth, focused, arrow) {
+  const children = [arrow, focused ? "[" : null, x];
+  if (x === "L") {
+    children.push(dom.a({ id: "active-anchor", href: "#" }, " anchor"));
+  }
+
+  if (focused) {
+    children.push("]");
+  }
+
+  return dom.div({}, ...children);
 }
 
 /*
@@ -666,7 +851,7 @@ function formatTree(wrapper) {
     .map(node => {
       const level = (node.prop("aria-level") || 1) - 1;
       const indentStr = "|  ".repeat(level);
-      const arrow = node.find("img.arrow");
+      const arrow = node.find(".arrow");
       let arrowStr = "  ";
       if (arrow.exists()) {
         arrowStr = arrow.hasClass("expanded") ? "▼ " : "▶︎ ";
@@ -702,6 +887,7 @@ function getSanitizedNodeText(node) {
 // M
 // `-- N
 //     `-- O
+
 var TEST_TREE = {
   children: {
     A: ["B", "C", "D"],

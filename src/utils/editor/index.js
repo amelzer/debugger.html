@@ -11,14 +11,19 @@ export * from "../ui";
 export { onMouseOver } from "./token-events";
 
 import { createEditor } from "./create-editor";
-import { shouldPrettyPrint, isOriginal } from "../source";
+import { shouldPrettyPrint } from "../source";
 import { findNext, findPrev } from "./source-search";
 
 import { isWasm, lineToWasmOffset, wasmOffsetToLine } from "../wasm";
 
 import type { AstLocation } from "../../workers/parser";
 import type { EditorPosition, EditorRange } from "../editor/types";
-import type { Location } from "../../types";
+import type {
+  SearchModifiers,
+  Source,
+  SourceContent,
+  SourceLocation
+} from "../../types";
 type Editor = Object;
 
 let editor: ?Editor;
@@ -37,7 +42,7 @@ export function removeEditor() {
 }
 
 function getCodeMirror() {
-  return editor && editor.codeMirror;
+  return editor && editor.hasCodeMirror ? editor.codeMirror : null;
 }
 
 export function startOperation() {
@@ -58,25 +63,17 @@ export function endOperation() {
   codeMirror.endOperation();
 }
 
-export function shouldShowPrettyPrint(selectedSource) {
-  if (!selectedSource) {
-    return false;
-  }
-
-  return shouldPrettyPrint(selectedSource);
+export function shouldShowPrettyPrint(source: Source, content: SourceContent) {
+  return shouldPrettyPrint(source, content);
 }
 
-export function shouldShowFooter(selectedSource, horizontal) {
-  if (!horizontal) {
-    return true;
-  }
-  if (!selectedSource) {
-    return false;
-  }
-  return shouldShowPrettyPrint(selectedSource) || isOriginal(selectedSource);
-}
-
-export function traverseResults(e, ctx, query, dir, modifiers) {
+export function traverseResults(
+  e: Event,
+  ctx: any,
+  query: string,
+  dir: string,
+  modifiers: SearchModifiers
+) {
   e.stopPropagation();
   e.preventDefault();
 
@@ -96,7 +93,15 @@ export function toEditorLine(sourceId: string, lineOrOffset: number): number {
   return lineOrOffset ? lineOrOffset - 1 : 1;
 }
 
-export function toEditorPosition(location: Location): EditorPosition {
+export function fromEditorLine(sourceId: string, line: number): number {
+  if (isWasm(sourceId)) {
+    return lineToWasmOffset(sourceId, line) || 0;
+  }
+
+  return line + 1;
+}
+
+export function toEditorPosition(location: SourceLocation): EditorPosition {
   return {
     line: toEditorLine(location.sourceId, location.line),
     column: isWasm(location.sourceId) || !location.column ? 0 : location.column
@@ -158,56 +163,108 @@ function isVisible(codeMirror: any, top: number, left: number) {
   return inXView && inYView;
 }
 
-export function markText(_editor: any, className, { start, end }: EditorRange) {
-  return _editor.codeMirror.markText(
+export function getLocationsInViewport({ codeMirror }: Object) {
+  // Get scroll position
+  if (!codeMirror) {
+    return {
+      start: { line: 0, column: 0 },
+      end: { line: 0, column: 0 }
+    };
+  }
+  const charWidth = codeMirror.defaultCharWidth();
+  const scrollArea = codeMirror.getScrollInfo();
+  const { scrollLeft } = codeMirror.doc;
+  const rect = codeMirror.getWrapperElement().getBoundingClientRect();
+  const topVisibleLine = codeMirror.lineAtHeight(rect.top, "window");
+  const bottomVisibleLine = codeMirror.lineAtHeight(rect.bottom, "window");
+
+  const leftColumn = Math.floor(scrollLeft > 0 ? scrollLeft / charWidth : 0);
+  const rightPosition = scrollLeft + (scrollArea.clientWidth - 30);
+  const rightCharacter = Math.floor(rightPosition / charWidth);
+
+  return {
+    start: {
+      line: topVisibleLine,
+      column: leftColumn
+    },
+    end: {
+      line: bottomVisibleLine,
+      column: rightCharacter
+    }
+  };
+}
+
+export function markText(
+  { codeMirror }: Object,
+  className: string,
+  { start, end }: EditorRange
+) {
+  return codeMirror.markText(
     { ch: start.column, line: start.line },
     { ch: end.column, line: end.line },
     { className }
   );
 }
 
-export function lineAtHeight(_editor, sourceId, event) {
-  const _editorLine = _editor.codeMirror.lineAtHeight(event.clientY);
+export function lineAtHeight(
+  { codeMirror }: Object,
+  sourceId: string,
+  event: MouseEvent
+) {
+  const _editorLine = codeMirror.lineAtHeight(event.clientY);
   return toSourceLine(sourceId, _editorLine);
 }
 
 export function getSourceLocationFromMouseEvent(
-  _editor: Object,
-  selectedLocation: Location,
+  { codeMirror }: Object,
+  source: Source,
   e: MouseEvent
 ) {
-  const { line, ch } = _editor.codeMirror.coordsChar({
+  const { line, ch } = codeMirror.coordsChar({
     left: e.clientX,
     top: e.clientY
   });
 
   return {
-    sourceId: selectedLocation.sourceId,
+    sourceId: source.id,
     line: line + 1,
     column: ch + 1
   };
 }
 
-export function forEachLine(codeMirror, iter) {
+export function forEachLine(codeMirror: Object, iter: Function) {
   codeMirror.operation(() => {
     codeMirror.doc.iter(0, codeMirror.lineCount(), iter);
   });
 }
 
-export function removeLineClass(codeMirror, line, className) {
+export function removeLineClass(
+  codeMirror: Object,
+  line: number,
+  className: string
+) {
   codeMirror.removeLineClass(line, "line", className);
 }
 
-export function clearLineClass(codeMirror, className) {
+export function clearLineClass(codeMirror: Object, className: string) {
   forEachLine(codeMirror, line => {
     removeLineClass(codeMirror, line, className);
   });
 }
 
-export function getTextForLine(codeMirror, line) {
+export function getTextForLine(codeMirror: Object, line: number): string {
   return codeMirror.getLine(line - 1).trim();
 }
 
-export function getCursorLine(codeMirror): number {
+export function getCursorLine(codeMirror: Object): number {
   return codeMirror.getCursor().line;
+}
+
+export function getTokenEnd(codeMirror: Object, line: number, column: number) {
+  const token = codeMirror.getTokenAt({
+    line: line,
+    ch: column + 1
+  });
+
+  return token.end;
 }

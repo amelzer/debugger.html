@@ -5,12 +5,16 @@
 
 const {
   getOriginalURLs,
+  hasOriginalURL,
   getOriginalRanges,
   getGeneratedRanges,
   getGeneratedLocation,
   getAllGeneratedLocations,
   getOriginalLocation,
+  getOriginalLocations,
   getOriginalSourceText,
+  getGeneratedRangesForOriginal,
+  getFileGeneratedRange,
   hasMappedSource,
   clearSourceMaps,
   applySourceMap
@@ -28,13 +32,17 @@ const {
 self.onmessage = workerHandler({
   setAssetRootURL,
   getOriginalURLs,
+  hasOriginalURL,
   getOriginalRanges,
   getGeneratedRanges,
   getGeneratedLocation,
   getAllGeneratedLocations,
   getOriginalLocation,
+  getOriginalLocations,
   getOriginalSourceText,
   getOriginalStackFrames,
+  getGeneratedRangesForOriginal,
+  getFileGeneratedRange,
   hasMappedSource,
   applySourceMap,
   clearSourceMaps

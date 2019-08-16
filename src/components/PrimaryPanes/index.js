@@ -5,36 +5,48 @@
 // @flow
 
 import React, { Component } from "react";
-import { connect } from "react-redux";
+import classnames from "classnames";
 import { Tab, Tabs, TabList, TabPanels } from "react-aria-components/src/tabs";
-import { formatKeyShortcut } from "../../utils/text";
+
 import actions from "../../actions";
 import {
-  getSources,
+  getDisplayedSources,
   getActiveSearch,
-  getSelectedPrimaryPaneTab
+  getProjectDirectoryRoot,
+  getSelectedPrimaryPaneTab,
+  getThreads,
+  getContext
 } from "../../selectors";
 import { features, prefs } from "../../utils/prefs";
-import "./Sources.css";
-import classnames from "classnames";
+import { connect } from "../../utils/connect";
+import { formatKeyShortcut } from "../../utils/text";
 
 import Outline from "./Outline";
 import SourcesTree from "./SourcesTree";
+import AccessibleImage from "../shared/AccessibleImage";
 
-import type { SourcesMap } from "../../reducers/types";
+import type { SourcesMapByThread } from "../../reducers/types";
+import type { SelectedPrimaryPaneTabType } from "../../selectors";
+import type { Thread, Context } from "../../types";
+
+import "./Sources.css";
 
 type State = {
   alphabetizeOutline: boolean
 };
 
 type Props = {
-  selectedTab: string,
-  sources: SourcesMap,
+  cx: Context,
+  selectedTab: SelectedPrimaryPaneTabType,
+  sources: SourcesMapByThread,
   horizontal: boolean,
+  projectRoot: string,
   sourceSearchOn: boolean,
-  setPrimaryPaneTab: string => void,
-  setActiveSearch: string => void,
-  closeActiveSearch: () => void
+  setPrimaryPaneTab: typeof actions.setPrimaryPaneTab,
+  setActiveSearch: typeof actions.setActiveSearch,
+  closeActiveSearch: typeof actions.closeActiveSearch,
+  clearProjectDirectoryRoot: typeof actions.clearProjectDirectoryRoot,
+  threads: Thread[]
 };
 
 class PrimaryPanes extends Component<Props, State> {
@@ -46,7 +58,7 @@ class PrimaryPanes extends Component<Props, State> {
     };
   }
 
-  showPane = (selectedPane: string) => {
+  showPane = (selectedPane: SelectedPrimaryPaneTabType) => {
     this.props.setPrimaryPaneTab(selectedPane);
   };
 
@@ -90,8 +102,36 @@ class PrimaryPanes extends Component<Props, State> {
     ];
   }
 
+  renderProjectRootHeader() {
+    const { cx, projectRoot } = this.props;
+
+    if (!projectRoot) {
+      return null;
+    }
+
+    const rootLabel = projectRoot.split("/").pop();
+
+    return (
+      <div key="root" className="sources-clear-root-container">
+        <button
+          className="sources-clear-root"
+          onClick={() => this.props.clearProjectDirectoryRoot(cx)}
+          title={L10N.getStr("removeDirectoryRoot.label")}
+        >
+          <AccessibleImage className="home" />
+          <AccessibleImage className="breadcrumb" />
+          <span className="sources-clear-root-label">{rootLabel}</span>
+        </button>
+      </div>
+    );
+  }
+
+  renderThreadSources() {
+    return <SourcesTree threads={this.props.threads} />;
+  }
+
   render() {
-    const { selectedTab } = this.props;
+    const { selectedTab, projectRoot } = this.props;
     const activeIndex = selectedTab === "sources" ? 0 : 1;
 
     return (
@@ -103,8 +143,16 @@ class PrimaryPanes extends Component<Props, State> {
         <TabList className="source-outline-tabs">
           {this.renderOutlineTabs()}
         </TabList>
-        <TabPanels className="source-outline-panel" hasFocusableContent>
-          <SourcesTree />
+        <TabPanels
+          className={classnames("source-outline-panel", {
+            "has-root": projectRoot
+          })}
+          hasFocusableContent
+        >
+          <div className="threads-list">
+            {this.renderProjectRootHeader()}
+            {this.renderThreadSources()}
+          </div>
           <Outline
             alphabetizeOutline={this.state.alphabetizeOutline}
             onAlphabetizeClick={this.onAlphabetizeClick}
@@ -116,16 +164,22 @@ class PrimaryPanes extends Component<Props, State> {
 }
 
 const mapStateToProps = state => ({
+  cx: getContext(state),
   selectedTab: getSelectedPrimaryPaneTab(state),
-  sources: getSources(state),
-  sourceSearchOn: getActiveSearch(state) === "source"
+  sources: getDisplayedSources(state),
+  sourceSearchOn: getActiveSearch(state) === "source",
+  threads: getThreads(state),
+  projectRoot: getProjectDirectoryRoot(state)
 });
 
-export default connect(
+const connector = connect(
   mapStateToProps,
   {
     setPrimaryPaneTab: actions.setPrimaryPaneTab,
     setActiveSearch: actions.setActiveSearch,
-    closeActiveSearch: actions.closeActiveSearch
+    closeActiveSearch: actions.closeActiveSearch,
+    clearProjectDirectoryRoot: actions.clearProjectDirectoryRoot
   }
-)(PrimaryPanes);
+);
+
+export default connector(PrimaryPanes);

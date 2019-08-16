@@ -2,7 +2,7 @@
 
 exports[`SearchInput renders 1`] = `
 <div
-  className="search-shadow"
+  className="search-outline"
 >
   <div
     aria-expanded={false}
@@ -11,23 +11,22 @@ exports[`SearchInput renders 1`] = `
     className="search-field"
     role="combobox"
   >
-    <Svg
-      name="magnifying-glass"
+    <AccessibleImage
+      className="search"
     />
     <input
       aria-activedescendant=""
       aria-autocomplete="list"
       aria-controls="result-list"
       className=""
-      onBlur={[Function]}
-      onFocus={[Function]}
+      onChange={[Function]}
       onKeyDown={[Function]}
       placeholder="A placeholder"
       spellCheck={false}
       value=""
     />
     <div
-      className="summary"
+      className="search-field-summary"
     >
       So many results
     </div>
@@ -40,7 +39,7 @@ exports[`SearchInput renders 1`] = `
 
 exports[`SearchInput shows nav buttons 1`] = `
 <div
-  className="search-shadow"
+  className="search-outline"
 >
   <div
     aria-expanded={false}
@@ -49,23 +48,22 @@ exports[`SearchInput shows nav buttons 1`] = `
     className="search-field"
     role="combobox"
   >
-    <Svg
-      name="magnifying-glass"
+    <AccessibleImage
+      className="search"
     />
     <input
       aria-activedescendant=""
       aria-autocomplete="list"
       aria-controls="result-list"
       className=""
-      onBlur={[Function]}
-      onFocus={[Function]}
+      onChange={[Function]}
       onKeyDown={[Function]}
       placeholder="A placeholder"
       spellCheck={false}
       value=""
     />
     <div
-      className="summary"
+      className="search-field-summary"
     >
       So many results
     </div>
@@ -79,8 +77,8 @@ exports[`SearchInput shows nav buttons 1`] = `
         title="Previous result"
         type="arrow-up"
       >
-        <Svg
-          name="arrow-up"
+        <AccessibleImage
+          className="arrow-up"
         />
       </button>
       <button
@@ -90,8 +88,8 @@ exports[`SearchInput shows nav buttons 1`] = `
         title="Next result"
         type="arrow-down"
       >
-        <Svg
-          name="arrow-down"
+        <AccessibleImage
+          className="arrow-down"
         />
       </button>
     </div>
@@ -104,7 +102,7 @@ exports[`SearchInput shows nav buttons 1`] = `
 
 exports[`SearchInput shows svg error emoji 1`] = `
 <div
-  className="search-shadow"
+  className="search-outline"
 >
   <div
     aria-expanded={false}
@@ -113,23 +111,22 @@ exports[`SearchInput shows svg error emoji 1`] = `
     className="search-field"
     role="combobox"
   >
-    <Svg
-      name="sad-face"
+    <AccessibleImage
+      className="search"
     />
     <input
       aria-activedescendant=""
       aria-autocomplete="list"
       aria-controls="result-list"
       className="empty"
-      onBlur={[Function]}
-      onFocus={[Function]}
+      onChange={[Function]}
       onKeyDown={[Function]}
       placeholder="A placeholder"
       spellCheck={false}
       value=""
     />
     <div
-      className="summary"
+      className="search-field-summary"
     >
       So many results
     </div>
@@ -143,8 +140,8 @@ exports[`SearchInput shows svg error emoji 1`] = `
         title="Previous result"
         type="arrow-up"
       >
-        <Svg
-          name="arrow-up"
+        <AccessibleImage
+          className="arrow-up"
         />
       </button>
       <button
@@ -154,8 +151,8 @@ exports[`SearchInput shows svg error emoji 1`] = `
         title="Next result"
         type="arrow-down"
       >
-        <Svg
-          name="arrow-down"
+        <AccessibleImage
+          className="arrow-down"
         />
       </button>
     </div>
@@ -168,7 +165,7 @@ exports[`SearchInput shows svg error emoji 1`] = `
 
 exports[`SearchInput shows svg magnifying glass 1`] = `
 <div
-  className="search-shadow"
+  className="search-outline"
 >
   <div
     aria-expanded={false}
@@ -177,23 +174,22 @@ exports[`SearchInput shows svg magnifying glass 1`] = `
     className="search-field"
     role="combobox"
   >
-    <Svg
-      name="magnifying-glass"
+    <AccessibleImage
+      className="search"
     />
     <input
       aria-activedescendant=""
       aria-autocomplete="list"
       aria-controls="result-list"
       className=""
-      onBlur={[Function]}
-      onFocus={[Function]}
+      onChange={[Function]}
       onKeyDown={[Function]}
       placeholder="A placeholder"
       spellCheck={false}
       value=""
     />
     <div
-      className="summary"
+      className="search-field-summary"
     >
       So many results
     </div>
@@ -207,8 +203,8 @@ exports[`SearchInput shows svg magnifying glass 1`] = `
         title="Previous result"
         type="arrow-up"
       >
-        <Svg
-          name="arrow-up"
+        <AccessibleImage
+          className="arrow-up"
         />
       </button>
       <button
@@ -218,8 +214,8 @@ exports[`SearchInput shows svg magnifying glass 1`] = `
         title="Next result"
         type="arrow-down"
       >
-        <Svg
-          name="arrow-down"
+        <AccessibleImage
+          className="arrow-down"
         />
       </button>
     </div>

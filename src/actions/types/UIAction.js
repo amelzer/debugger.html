@@ -4,7 +4,12 @@
 
 // @flow
 
-import type { Source } from "../../types";
+import type {
+  Source,
+  PartialRange,
+  SourceLocation,
+  Context
+} from "../../types";
 
 import type {
   ActiveSearchType,
@@ -40,10 +45,6 @@ export type UIAction =
       +paneCollapsed: boolean
     |}
   | {|
-      +type: "SET_CONTEXT_MENU",
-      +contextMenu: { type: string, event: any }
-    |}
-  | {|
       +type: "SET_ORIENTATION",
       +orientation: OrientationType
     |}
@@ -60,13 +61,15 @@ export type UIAction =
     |}
   | {|
       +type: "OPEN_CONDITIONAL_PANEL",
-      +line: number
+      +location: SourceLocation,
+      +log: boolean
     |}
   | {|
       +type: "CLOSE_CONDITIONAL_PANEL"
     |}
   | {|
       +type: "SET_PROJECT_DIRECTORY_ROOT",
+      +cx: Context,
       +url: string
     |}
   | {|
@@ -75,4 +78,8 @@ export type UIAction =
     |}
   | {|
       +type: "CLOSE_PROJECT_SEARCH"
+    |}
+  | {|
+      +type: "SET_VIEWPORT",
+      +viewport: PartialRange
     |};

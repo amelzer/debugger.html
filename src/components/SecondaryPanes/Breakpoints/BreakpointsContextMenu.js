@@ -2,10 +2,38 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
-import { buildMenu, showMenu } from "devtools-contextmenu";
+// @flow
 
-export default function showContextMenu(props) {
+import { buildMenu, showMenu } from "devtools-contextmenu";
+import { getSelectedLocation } from "../../../utils/selected-location";
+import actions from "../../../actions";
+import { features } from "../../../utils/prefs";
+
+import type { Breakpoint, Source, Context } from "../../../types";
+
+type Props = {
+  cx: Context,
+  breakpoint: Breakpoint,
+  breakpoints: Breakpoint[],
+  selectedSource: Source,
+  removeBreakpoint: typeof actions.removeBreakpoint,
+  removeBreakpoints: typeof actions.removeBreakpoints,
+  removeAllBreakpoints: typeof actions.removeAllBreakpoints,
+  toggleBreakpoints: typeof actions.toggleBreakpoints,
+  toggleAllBreakpoints: typeof actions.toggleAllBreakpoints,
+  toggleDisabledBreakpoint: typeof actions.toggleDisabledBreakpoint,
+  selectSpecificLocation: typeof actions.selectSpecificLocation,
+  setBreakpointOptions: typeof actions.setBreakpointOptions,
+  openConditionalPanel: typeof actions.openConditionalPanel,
+  contextMenuEvent: SyntheticEvent<HTMLElement>
+};
+
+export default function showContextMenu(props: Props) {
   const {
+    cx,
+    breakpoint,
+    breakpoints,
+    selectedSource,
     removeBreakpoint,
     removeBreakpoints,
     removeAllBreakpoints,
@@ -13,10 +41,8 @@ export default function showContextMenu(props) {
     toggleAllBreakpoints,
     toggleDisabledBreakpoint,
     selectSpecificLocation,
-    setBreakpointCondition,
+    setBreakpointOptions,
     openConditionalPanel,
-    breakpoints,
-    breakpoint,
     contextMenuEvent
   } = props;
 
@@ -74,14 +100,15 @@ export default function showContextMenu(props) {
     "breakpointMenuItem.addCondition2.accesskey"
   );
 
-  const otherBreakpoints = breakpoints.filter(b => b !== breakpoint);
+  const selectedLocation = getSelectedLocation(breakpoint, selectedSource);
+  const otherBreakpoints = breakpoints.filter(b => b.id !== breakpoint.id);
   const enabledBreakpoints = breakpoints.filter(b => !b.disabled);
   const disabledBreakpoints = breakpoints.filter(b => b.disabled);
   const otherEnabledBreakpoints = breakpoints.filter(
-    b => !b.disabled && b !== breakpoint
+    b => !b.disabled && b.id !== breakpoint.id
   );
   const otherDisabledBreakpoints = breakpoints.filter(
-    b => b.disabled && b !== breakpoint
+    b => b.disabled && b.id !== breakpoint.id
   );
 
   const deleteSelfItem = {
@@ -89,7 +116,9 @@ export default function showContextMenu(props) {
     label: deleteSelfLabel,
     accesskey: deleteSelfKey,
     disabled: false,
-    click: () => removeBreakpoint(breakpoint.location)
+    click: () => {
+      removeBreakpoint(cx, breakpoint);
+    }
   };
 
   const deleteAllItem = {
@@ -97,7 +126,7 @@ export default function showContextMenu(props) {
     label: deleteAllLabel,
     accesskey: deleteAllKey,
     disabled: false,
-    click: () => removeAllBreakpoints()
+    click: () => removeAllBreakpoints(cx)
   };
 
   const deleteOthersItem = {
@@ -105,7 +134,7 @@ export default function showContextMenu(props) {
     label: deleteOthersLabel,
     accesskey: deleteOthersKey,
     disabled: false,
-    click: () => removeBreakpoints(otherBreakpoints)
+    click: () => removeBreakpoints(cx, otherBreakpoints)
   };
 
   const enableSelfItem = {
@@ -113,7 +142,9 @@ export default function showContextMenu(props) {
     label: enableSelfLabel,
     accesskey: enableSelfKey,
     disabled: false,
-    click: () => toggleDisabledBreakpoint(breakpoint.location.line)
+    click: () => {
+      toggleDisabledBreakpoint(cx, breakpoint);
+    }
   };
 
   const enableAllItem = {
@@ -121,7 +152,7 @@ export default function showContextMenu(props) {
     label: enableAllLabel,
     accesskey: enableAllKey,
     disabled: false,
-    click: () => toggleAllBreakpoints(false)
+    click: () => toggleAllBreakpoints(cx, false)
   };
 
   const enableOthersItem = {
@@ -129,7 +160,7 @@ export default function showContextMenu(props) {
     label: enableOthersLabel,
     accesskey: enableOthersKey,
     disabled: false,
-    click: () => toggleBreakpoints(false, otherDisabledBreakpoints)
+    click: () => toggleBreakpoints(cx, false, otherDisabledBreakpoints)
   };
 
   const disableSelfItem = {
@@ -137,7 +168,9 @@ export default function showContextMenu(props) {
     label: disableSelfLabel,
     accesskey: disableSelfKey,
     disabled: false,
-    click: () => toggleDisabledBreakpoint(breakpoint.location.line)
+    click: () => {
+      toggleDisabledBreakpoint(cx, breakpoint);
+    }
   };
 
   const disableAllItem = {
@@ -145,14 +178,14 @@ export default function showContextMenu(props) {
     label: disableAllLabel,
     accesskey: disableAllKey,
     disabled: false,
-    click: () => toggleAllBreakpoints(true)
+    click: () => toggleAllBreakpoints(cx, true)
   };
 
   const disableOthersItem = {
     id: "node-menu-disable-others",
     label: disableOthersLabel,
     accesskey: disableOthersKey,
-    click: () => toggleBreakpoints(true, otherEnabledBreakpoints)
+    click: () => toggleBreakpoints(cx, true, otherEnabledBreakpoints)
   };
 
   const removeConditionItem = {
@@ -160,7 +193,11 @@ export default function showContextMenu(props) {
     label: removeConditionLabel,
     accesskey: removeConditionKey,
     disabled: false,
-    click: () => setBreakpointCondition(breakpoint.location)
+    click: () =>
+      setBreakpointOptions(cx, selectedLocation, {
+        ...breakpoint.options,
+        condition: null
+      })
   };
 
   const addConditionItem = {
@@ -168,9 +205,10 @@ export default function showContextMenu(props) {
     label: addConditionLabel,
     accesskey: addConditionKey,
     click: () => {
-      selectSpecificLocation(breakpoint.location);
-      openConditionalPanel(breakpoint.location.line);
-    }
+      selectSpecificLocation(cx, selectedLocation);
+      openConditionalPanel(selectedLocation);
+    },
+    accelerator: L10N.getStr("toggleCondPanel.breakpoint.key")
   };
 
   const editConditionItem = {
@@ -178,16 +216,51 @@ export default function showContextMenu(props) {
     label: editConditionLabel,
     accesskey: editConditionKey,
     click: () => {
-      selectSpecificLocation(breakpoint.location);
-      openConditionalPanel(breakpoint.location.line);
-    }
+      selectSpecificLocation(cx, selectedLocation);
+      openConditionalPanel(selectedLocation);
+    },
+    accelerator: L10N.getStr("toggleCondPanel.breakpoint.key")
   };
 
+  const addLogPointItem = {
+    id: "node-menu-add-log-point",
+    label: L10N.getStr("editor.addLogPoint"),
+    accesskey: L10N.getStr("editor.addLogPoint.accesskey"),
+    disabled: false,
+    click: () => openConditionalPanel(selectedLocation, true),
+    accelerator: L10N.getStr("toggleCondPanel.logPoint.key")
+  };
+
+  const editLogPointItem = {
+    id: "node-menu-edit-log-point",
+    label: L10N.getStr("editor.editLogPoint"),
+    accesskey: L10N.getStr("editor.editLogPoint.accesskey"),
+    disabled: false,
+    click: () => openConditionalPanel(selectedLocation, true),
+    accelerator: L10N.getStr("toggleCondPanel.logPoint.key")
+  };
+
+  const removeLogPointItem = {
+    id: "node-menu-remove-log",
+    label: L10N.getStr("editor.removeLogPoint.label"),
+    accesskey: L10N.getStr("editor.removeLogPoint.accesskey"),
+    disabled: false,
+    click: () =>
+      setBreakpointOptions(cx, selectedLocation, {
+        ...breakpoint.options,
+        logValue: null
+      })
+  };
+
+  const logPointItem = breakpoint.options.logValue
+    ? editLogPointItem
+    : addLogPointItem;
+
   const hideEnableSelfItem = !breakpoint.disabled;
-  const hideEnableAllItem = disabledBreakpoints.size === 0;
-  const hideEnableOthersItem = otherDisabledBreakpoints.size === 0;
-  const hideDisableAllItem = enabledBreakpoints.size === 0;
-  const hideDisableOthersItem = otherEnabledBreakpoints.size === 0;
+  const hideEnableAllItem = disabledBreakpoints.length === 0;
+  const hideEnableOthersItem = otherDisabledBreakpoints.length === 0;
+  const hideDisableAllItem = enabledBreakpoints.length === 0;
+  const hideDisableOthersItem = otherEnabledBreakpoints.length === 0;
   const hideDisableSelfItem = breakpoint.disabled;
 
   const items = [
@@ -201,7 +274,7 @@ export default function showContextMenu(props) {
     },
     { item: deleteSelfItem },
     { item: deleteAllItem },
-    { item: deleteOthersItem, hidden: () => breakpoints.size === 1 },
+    { item: deleteOthersItem, hidden: () => breakpoints.length === 1 },
     {
       item: { type: "separator" },
       hidden: () =>
@@ -216,17 +289,26 @@ export default function showContextMenu(props) {
     },
     {
       item: addConditionItem,
-      hidden: () => breakpoint.condition
+      hidden: () => breakpoint.options.condition
     },
     {
       item: editConditionItem,
-      hidden: () => !breakpoint.condition
+      hidden: () => !breakpoint.options.condition
     },
     {
       item: removeConditionItem,
-      hidden: () => !breakpoint.condition
+      hidden: () => !breakpoint.options.condition
+    },
+    {
+      item: logPointItem,
+      hidden: () => !features.logPoints
+    },
+    {
+      item: removeLogPointItem,
+      hidden: () => !features.logPoints || !breakpoint.options.logValue
     }
   ];
 
   showMenu(contextMenuEvent, buildMenu(items));
+  return null;
 }

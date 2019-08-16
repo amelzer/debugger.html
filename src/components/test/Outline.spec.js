@@ -2,10 +2,13 @@
  * License, v. 2.0. If a copy of the MPL was not distributed with this
  * file, You can obtain one at <http://mozilla.org/MPL/2.0/>. */
 
+// @flow
+
 import React from "react";
 import { shallow } from "enzyme";
 import Outline from "../../components/PrimaryPanes/Outline";
 import { makeSymbolDeclaration } from "../../utils/test-head";
+import { mockcx } from "../../utils/test-mockup";
 import { showMenu } from "devtools-contextmenu";
 import { copyToTheClipboard } from "../../utils/clipboard";
 
@@ -17,6 +20,7 @@ const mockFunctionText = "mock function text";
 
 function generateDefaults(overrides) {
   return {
+    cx: mockcx,
     selectLocation: jest.fn(),
     selectedSource: { id: sourceId },
     getFunctionText: jest.fn().mockReturnValue(mockFunctionText),
@@ -33,6 +37,7 @@ function generateDefaults(overrides) {
 
 function render(overrides = {}) {
   const props = generateDefaults(overrides);
+  // $FlowIgnore
   const component = shallow(<Outline.WrappedComponent {...props} />);
   const instance = component.instance();
   return { component, props, instance };
@@ -40,7 +45,7 @@ function render(overrides = {}) {
 
 describe("Outline", () => {
   afterEach(() => {
-    copyToTheClipboard.mockClear();
+    (copyToTheClipboard: any).mockClear();
     showMenu.mockClear();
   });
 
@@ -67,14 +72,17 @@ describe("Outline", () => {
     const { selectLocation } = props;
     const listItem = component.find("li").first();
     listItem.simulate("click");
-    expect(selectLocation).toHaveBeenCalledWith({ line: startLine, sourceId });
+    expect(selectLocation).toHaveBeenCalledWith(mockcx, {
+      line: startLine,
+      sourceId
+    });
   });
 
   describe("renders outline", () => {
     describe("renders loading", () => {
       it("if symbols is not defined", () => {
         const { component } = render({
-          symbols: null
+          symbols: (null: any)
         });
         expect(component).toMatchSnapshot();
       });
@@ -103,7 +111,7 @@ describe("Outline", () => {
     describe("renders placeholder", () => {
       it("`No File Selected` if selectedSource is not defined", async () => {
         const { component } = render({
-          selectedSource: null
+          selectedSource: (null: any)
         });
         expect(component).toMatchSnapshot();
       });
@@ -207,14 +215,14 @@ describe("Outline", () => {
 
       await component.find("h2").simulate("click", {});
 
-      expect(props.selectLocation).toHaveBeenCalledWith({
+      expect(props.selectLocation).toHaveBeenCalledWith(mockcx, {
         line: 24,
         sourceId: sourceId
       });
     });
 
     it("does not select an item if selectedSource is not defined", async () => {
-      const { instance, props } = render({ selectedSource: null });
+      const { instance, props } = render({ selectedSource: (null: any) });
       await instance.selectItem({});
       expect(props.selectLocation).not.toHaveBeenCalled();
     });
@@ -243,7 +251,7 @@ describe("Outline", () => {
         stopPropagation: jest.fn()
       };
       const { instance } = render({
-        selectedSource: null
+        selectedSource: (null: any)
       });
       await instance.onContextMenu(mockEvent, {});
       expect(mockEvent.preventDefault).toHaveBeenCalled();

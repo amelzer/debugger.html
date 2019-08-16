@@ -7,12 +7,14 @@ const PropTypes = require("prop-types");
 
 // Utils
 const { isGrip, wrapRender } = require("./rep-utils");
-const { rep: StringRep } = require("./string");
+const { rep: StringRep, isLongString } = require("./string");
 const { MODE } = require("./constants");
 const nodeConstants = require("../shared/dom-node-constants");
 
 const dom = require("react-dom-factories");
 const { span } = dom;
+
+const MAX_ATTRIBUTE_LENGTH = 50;
 
 /**
  * Renders DOM element node.
@@ -91,7 +93,8 @@ function getElements(grip, mode) {
     attributes,
     nodeName,
     isAfterPseudoElement,
-    isBeforePseudoElement
+    isBeforePseudoElement,
+    isMarkerPseudoElement
   } = grip.preview;
   const nodeNameElement = span(
     {
@@ -100,13 +103,16 @@ function getElements(grip, mode) {
     nodeName
   );
 
-  if (isAfterPseudoElement || isBeforePseudoElement) {
-    return [
-      span(
-        { className: "attrName" },
-        `::${isAfterPseudoElement ? "after" : "before"}`
-      )
-    ];
+  let pseudoNodeName;
+  if (isAfterPseudoElement) {
+    pseudoNodeName = "after";
+  } else if (isBeforePseudoElement) {
+    pseudoNodeName = "before";
+  } else if (isMarkerPseudoElement) {
+    pseudoNodeName = "marker";
+  }
+  if (pseudoNodeName) {
+    return [span({ className: "attrName" }, `::${pseudoNodeName}`)];
   }
 
   if (mode === MODE.TINY) {
@@ -140,11 +146,22 @@ function getElements(grip, mode) {
   }
   const attributeElements = attributeKeys.reduce((arr, name, i, keys) => {
     const value = attributes[name];
+
+    let title = isLongString(value) ? value.initial : value;
+    if (title.length < MAX_ATTRIBUTE_LENGTH) {
+      title = null;
+    }
+
     const attribute = span(
       {},
       span({ className: "attrName" }, name),
       span({ className: "attrEqual" }, "="),
-      StringRep({ className: "attrValue", object: value })
+      StringRep({
+        className: "attrValue",
+        object: value,
+        cropLimit: MAX_ATTRIBUTE_LENGTH,
+        title
+      })
     );
 
     return arr.concat([" ", attribute]);
@@ -171,5 +188,6 @@ function supportsObject(object, noGrip = false) {
 // Exports from this module
 module.exports = {
   rep: wrapRender(ElementNode),
-  supportsObject
+  supportsObject,
+  MAX_ATTRIBUTE_LENGTH
 };

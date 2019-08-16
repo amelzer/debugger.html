@@ -8,27 +8,34 @@ exports[`Breakpoint disabled 1`] = `
   onDoubleClick={[Function]}
 >
   <input
+    aria-labelledby="1-label"
     checked={false}
     className="breakpoint-checkbox"
+    id={1}
     onChange={[Function]}
     onClick={[Function]}
     type="checkbox"
   />
-  <label
-    className="breakpoint-label cm-s-mozilla"
-    dangerouslySetInnerHTML={
-      Object {
-        "__html": "",
+  <span
+    className="breakpoint-label cm-s-mozilla devtools-monospace"
+    id="1-label"
+    onClick={[Function]}
+  >
+    <span
+      dangerouslySetInnerHTML={
+        Object {
+          "__html": "",
+        }
       }
-    }
-  />
+    />
+  </span>
   <div
     className="breakpoint-line-close"
   >
     <div
-      className="breakpoint-line"
+      className="breakpoint-line devtools-monospace"
     >
-      53
+      53:73
     </div>
     <CloseButton
       handleClick={[Function]}
@@ -46,27 +53,34 @@ exports[`Breakpoint paused at a different 1`] = `
   onDoubleClick={[Function]}
 >
   <input
+    aria-labelledby="1-label"
     checked={true}
     className="breakpoint-checkbox"
+    id={1}
     onChange={[Function]}
     onClick={[Function]}
     type="checkbox"
   />
-  <label
-    className="breakpoint-label cm-s-mozilla"
-    dangerouslySetInnerHTML={
-      Object {
-        "__html": "",
+  <span
+    className="breakpoint-label cm-s-mozilla devtools-monospace"
+    id="1-label"
+    onClick={[Function]}
+  >
+    <span
+      dangerouslySetInnerHTML={
+        Object {
+          "__html": "",
+        }
       }
-    }
-  />
+    />
+  </span>
   <div
     className="breakpoint-line-close"
   >
     <div
-      className="breakpoint-line"
+      className="breakpoint-line devtools-monospace"
     >
-      53
+      53:73
     </div>
     <CloseButton
       handleClick={[Function]}
@@ -84,27 +98,34 @@ exports[`Breakpoint paused at a generatedLocation 1`] = `
   onDoubleClick={[Function]}
 >
   <input
+    aria-labelledby="1-label"
     checked={true}
     className="breakpoint-checkbox"
+    id={1}
     onChange={[Function]}
     onClick={[Function]}
     type="checkbox"
   />
-  <label
-    className="breakpoint-label cm-s-mozilla"
-    dangerouslySetInnerHTML={
-      Object {
-        "__html": "",
+  <span
+    className="breakpoint-label cm-s-mozilla devtools-monospace"
+    id="1-label"
+    onClick={[Function]}
+  >
+    <span
+      dangerouslySetInnerHTML={
+        Object {
+          "__html": "",
+        }
       }
-    }
-  />
+    />
+  </span>
   <div
     className="breakpoint-line-close"
   >
     <div
-      className="breakpoint-line"
+      className="breakpoint-line devtools-monospace"
     >
-      53
+      53:73
     </div>
     <CloseButton
       handleClick={[Function]}
@@ -122,65 +143,34 @@ exports[`Breakpoint paused at an original location 1`] = `
   onDoubleClick={[Function]}
 >
   <input
+    aria-labelledby="1-label"
     checked={true}
     className="breakpoint-checkbox"
+    id={1}
     onChange={[Function]}
     onClick={[Function]}
     type="checkbox"
   />
-  <label
-    className="breakpoint-label cm-s-mozilla"
-    dangerouslySetInnerHTML={
-      Object {
-        "__html": "",
-      }
-    }
-  />
-  <div
-    className="breakpoint-line-close"
+  <span
+    className="breakpoint-label cm-s-mozilla devtools-monospace"
+    id="1-label"
+    onClick={[Function]}
   >
-    <div
-      className="breakpoint-line"
-    >
-      5
-    </div>
-    <CloseButton
-      handleClick={[Function]}
-      tooltip="Remove breakpoint"
+    <span
+      dangerouslySetInnerHTML={
+        Object {
+          "__html": "",
+        }
+      }
     />
-  </div>
-</div>
-`;
-
-exports[`Breakpoint selected source is original 1`] = `
-<div
-  className="breakpoint"
-  onClick={[Function]}
-  onContextMenu={[Function]}
-  onDoubleClick={[Function]}
->
-  <input
-    checked={true}
-    className="breakpoint-checkbox"
-    onChange={[Function]}
-    onClick={[Function]}
-    type="checkbox"
-  />
-  <label
-    className="breakpoint-label cm-s-mozilla"
-    dangerouslySetInnerHTML={
-      Object {
-        "__html": "",
-      }
-    }
-  />
+  </span>
   <div
     className="breakpoint-line-close"
   >
     <div
-      className="breakpoint-line"
+      className="breakpoint-line devtools-monospace"
     >
-      5
+      5:7
     </div>
     <CloseButton
       handleClick={[Function]}
@@ -198,27 +188,34 @@ exports[`Breakpoint simple 1`] = `
   onDoubleClick={[Function]}
 >
   <input
+    aria-labelledby="1-label"
     checked={true}
     className="breakpoint-checkbox"
+    id={1}
     onChange={[Function]}
     onClick={[Function]}
     type="checkbox"
   />
-  <label
-    className="breakpoint-label cm-s-mozilla"
-    dangerouslySetInnerHTML={
-      Object {
-        "__html": "",
+  <span
+    className="breakpoint-label cm-s-mozilla devtools-monospace"
+    id="1-label"
+    onClick={[Function]}
+  >
+    <span
+      dangerouslySetInnerHTML={
+        Object {
+          "__html": "",
+        }
       }
-    }
-  />
+    />
+  </span>
   <div
     className="breakpoint-line-close"
   >
     <div
-      className="breakpoint-line"
+      className="breakpoint-line devtools-monospace"
     >
-      53
+      53:73
     </div>
     <CloseButton
       handleClick={[Function]}

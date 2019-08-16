@@ -4,48 +4,54 @@
 
 // @flow
 import React, { Component } from "react";
+import PropTypes from "prop-types";
 import classNames from "classnames";
-import Svg from "../../shared/Svg";
-import {
-  getLibraryFromUrl,
-  formatDisplayName
-} from "../../../utils/pause/frames";
+
+import { getLibraryFromUrl } from "../../../utils/pause/frames";
+
 import FrameMenu from "./FrameMenu";
+import AccessibleImage from "../../shared/AccessibleImage";
+import FrameComponent from "./Frame";
 
 import "./Group.css";
 
-import FrameComponent from "./Frame";
-
-import type { LocalFrame } from "./types";
+import actions from "../../../actions";
+import type { Frame, ThreadContext } from "../../../types";
 import Badge from "../../shared/Badge";
+import FrameIndent from "./FrameIndent";
 
-type FrameLocationProps = { frame: LocalFrame };
-function FrameLocation({ frame }: FrameLocationProps) {
+type FrameLocationProps = { frame: Frame, expanded: boolean };
+function FrameLocation({ frame, expanded }: FrameLocationProps) {
   const library = frame.library || getLibraryFromUrl(frame);
   if (!library) {
     return null;
   }
 
+  const arrowClassName = classNames("arrow", { expanded });
   return (
-    <div className="location">
-      {library}
-      <Svg name={library.toLowerCase()} className="annotation-logo" />
-    </div>
+    <span className="group-description">
+      <AccessibleImage className={arrowClassName} />
+      <AccessibleImage className={`annotation-logo ${library.toLowerCase()}`} />
+      <span className="group-description-name">{library}</span>
+    </span>
   );
 }
 
 FrameLocation.displayName = "FrameLocation";
 
 type Props = {
-  group: LocalFrame[],
-  selectedFrame: LocalFrame,
-  selectFrame: Function,
+  cx: ThreadContext,
+  group: Frame[],
+  selectedFrame: Frame,
+  selectFrame: typeof actions.selectFrame,
   toggleFrameworkGrouping: Function,
   copyStackTrace: Function,
   toggleBlackBox: Function,
   frameworkGroupingOn: boolean,
   displayFullUrl: boolean,
-  getFrameTitle?: string => string
+  getFrameTitle?: string => string,
+  disableContextMenu: boolean,
+  selectable: boolean
 };
 
 type State = {
@@ -60,7 +66,7 @@ export default class Group extends Component<Props, State> {
     this.state = { expanded: false };
   }
 
-  onContextMenu(event: SyntheticKeyboardEvent<HTMLElement>) {
+  onContextMenu(event: SyntheticMouseEvent<HTMLElement>) {
     const {
       group,
       copyStackTrace,
@@ -77,12 +83,14 @@ export default class Group extends Component<Props, State> {
     );
   }
 
-  toggleFrames = () => {
+  toggleFrames = (event: SyntheticMouseEvent<HTMLElement>) => {
+    event.stopPropagation();
     this.setState(prevState => ({ expanded: !prevState.expanded }));
   };
 
   renderFrames() {
     const {
+      cx,
       group,
       selectFrame,
       selectedFrame,
@@ -91,7 +99,9 @@ export default class Group extends Component<Props, State> {
       toggleBlackBox,
       copyStackTrace,
       displayFullUrl,
-      getFrameTitle
+      getFrameTitle,
+      disableContextMenu,
+      selectable
     } = this.props;
 
     const { expanded } = this.state;
@@ -101,51 +111,70 @@ export default class Group extends Component<Props, State> {
 
     return (
       <div className="frames-list">
-        {group.map(frame => (
-          <FrameComponent
-            copyStackTrace={copyStackTrace}
-            frame={frame}
-            frameworkGroupingOn={frameworkGroupingOn}
-            hideLocation={true}
-            key={frame.id}
-            selectedFrame={selectedFrame}
-            selectFrame={selectFrame}
-            shouldMapDisplayName={false}
-            toggleBlackBox={toggleBlackBox}
-            toggleFrameworkGrouping={toggleFrameworkGrouping}
-            displayFullUrl={displayFullUrl}
-            getFrameTitle={getFrameTitle}
-          />
-        ))}
+        {group.reduce((acc, frame, i) => {
+          if (selectable) {
+            acc.push(<FrameIndent key={`frame-indent-${i}`} />);
+          }
+          return acc.concat(
+            <FrameComponent
+              cx={cx}
+              copyStackTrace={copyStackTrace}
+              frame={frame}
+              frameworkGroupingOn={frameworkGroupingOn}
+              hideLocation={true}
+              key={frame.id}
+              selectedFrame={selectedFrame}
+              selectFrame={selectFrame}
+              shouldMapDisplayName={false}
+              toggleBlackBox={toggleBlackBox}
+              toggleFrameworkGrouping={toggleFrameworkGrouping}
+              displayFullUrl={displayFullUrl}
+              getFrameTitle={getFrameTitle}
+              disableContextMenu={disableContextMenu}
+              selectable={selectable}
+            />
+          );
+        }, [])}
       </div>
     );
   }
 
   renderDescription() {
-    const frame = this.props.group[0];
-    const displayName = formatDisplayName(frame);
+    const { l10n } = this.context;
+    const { selectable, group } = this.props;
+
+    const frame = group[0];
+    const expanded = this.state.expanded;
+    const l10NEntry = this.state.expanded
+      ? "callStack.group.collapseTooltip"
+      : "callStack.group.expandTooltip";
+    const title = l10n.getFormatStr(l10NEntry, frame.library);
+
     return (
-      <li
+      <div
+        role="listitem"
         key={frame.id}
         className={classNames("group")}
         onClick={this.toggleFrames}
         tabIndex={0}
+        title={title}
       >
-        <div className="d-flex align-items-center min-width-0">
-          <div className="title">{displayName}</div>
-          <Badge>{this.props.group.length}</Badge>
-        </div>
-        <FrameLocation frame={frame} />
-      </li>
+        {selectable && <FrameIndent />}
+        <FrameLocation frame={frame} expanded={expanded} />
+        {selectable && <span className="clipboard-only"> </span>}
+        <Badge>{this.props.group.length}</Badge>
+        {selectable && <br className="clipboard-only" />}
+      </div>
     );
   }
 
   render() {
     const { expanded } = this.state;
+    const { disableContextMenu } = this.props;
     return (
       <div
         className={classNames("frames-group", { expanded })}
-        onContextMenu={e => this.onContextMenu(e)}
+        onContextMenu={disableContextMenu ? null : e => this.onContextMenu(e)}
       >
         {this.renderDescription()}
         {this.renderFrames()}
@@ -155,3 +184,4 @@ export default class Group extends Component<Props, State> {
 }
 
 Group.displayName = "Group";
+Group.contextTypes = { l10n: PropTypes.object };

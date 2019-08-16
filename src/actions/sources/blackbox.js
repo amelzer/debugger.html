@@ -9,24 +9,50 @@
  * @module actions/sources
  */
 
+import { isOriginalId, originalToGeneratedId } from "devtools-source-map";
 import { recordEvent } from "../../utils/telemetry";
+import { features } from "../../utils/prefs";
+import { getSourceActorsForSource } from "../../selectors";
 
 import { PROMISE } from "../utils/middleware/promise";
-import type { Source } from "../../types";
+
+import type { Source, Context } from "../../types";
 import type { ThunkArgs } from "../types";
 
-export function toggleBlackBox(source: Source) {
+async function blackboxActors(state, client, sourceId, isBlackBoxed, range?) {
+  for (const actor of getSourceActorsForSource(state, sourceId)) {
+    await client.blackBox(actor, isBlackBoxed, range);
+  }
+  return { isBlackBoxed: !isBlackBoxed };
+}
+
+export function toggleBlackBox(cx: Context, source: Source) {
   return async ({ dispatch, getState, client, sourceMaps }: ThunkArgs) => {
-    const { isBlackBoxed, id } = source;
+    const { isBlackBoxed } = source;
 
     if (!isBlackBoxed) {
       recordEvent("blackbox");
     }
 
+    let sourceId, range;
+    if (features.originalBlackbox && isOriginalId(source.id)) {
+      range = await sourceMaps.getFileGeneratedRange(source);
+      sourceId = originalToGeneratedId(source.id);
+    } else {
+      sourceId = source.id;
+    }
+
     return dispatch({
       type: "BLACKBOX",
+      cx,
       source,
-      [PROMISE]: client.blackBox(id, isBlackBoxed)
+      [PROMISE]: blackboxActors(
+        getState(),
+        client,
+        sourceId,
+        isBlackBoxed,
+        range
+      )
     });
   };
 }

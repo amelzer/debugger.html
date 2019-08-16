@@ -4,12 +4,14 @@
 
 // @flow
 
+import typeof SourceMaps from "devtools-source-map";
+
 import type { BindingLocationType, BindingType } from "../../../workers/parser";
 import { positionCmp } from "./positionCmp";
 import { filterSortedArray } from "./filtering";
 import { mappingContains } from "./mappingContains";
 
-import type { Source, Location, Position } from "../../../types";
+import type { Source, SourceLocation, PartialPosition } from "../../../types";
 
 import type { GeneratedBindingLocation } from "./buildGeneratedBindingList";
 
@@ -21,8 +23,8 @@ export type ApplicableBinding = {
 };
 
 type GeneratedRange = {
-  start: Position,
-  end: Position
+  start: PartialPosition,
+  end: PartialPosition
 };
 
 export async function originalRangeStartsInside(
@@ -31,10 +33,10 @@ export async function originalRangeStartsInside(
     start,
     end
   }: {
-    start: Location,
-    end: Location
+    start: SourceLocation,
+    end: SourceLocation
   },
-  sourceMaps: any
+  sourceMaps: SourceMaps
 ) {
   const endPosition = await sourceMaps.getGeneratedLocation(end, source);
   const startPosition = await sourceMaps.getGeneratedLocation(start, source);
@@ -53,16 +55,16 @@ export async function getApplicableBindingsForOriginalPosition(
     start,
     end
   }: {
-    start: Location,
-    end: Location
+    start: SourceLocation,
+    end: SourceLocation
   },
   bindingType: BindingType,
   locationType: BindingLocationType,
-  sourceMaps: any
+  sourceMaps: SourceMaps
 ): Promise<Array<ApplicableBinding>> {
   const ranges = await sourceMaps.getGeneratedRanges(start, source);
 
-  const resultRanges = ranges.map(mapRange => ({
+  const resultRanges: GeneratedRange[] = ranges.map(mapRange => ({
     start: {
       line: mapRange.line,
       column: mapRange.columnStart
@@ -91,8 +93,10 @@ export async function getApplicableBindingsForOriginalPosition(
         mappingContains(range, { start: startPosition, end: startPosition }) &&
         positionCmp(range.end, endPosition) < 0
       ) {
-        range.end.line = endPosition.line;
-        range.end.column = endPosition.column;
+        range.end = {
+          line: endPosition.line,
+          column: endPosition.column
+        };
         break;
       }
     }

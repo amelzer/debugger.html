@@ -15,9 +15,8 @@ exports[`ProjectSearch found no search results 1`] = `
         expanded={false}
         handleClose={[MockFunction]}
         hasPrefix={false}
-        onBlur={[Function]}
+        isLoading={false}
         onChange={[Function]}
-        onFocus={[Function]}
         onHistoryScroll={[Function]}
         onKeyDown={[Function]}
         placeholder="Find in files…"
@@ -43,29 +42,38 @@ exports[`ProjectSearch found search results 1`] = `
   activeSearch="project"
   clearSearch={[MockFunction]}
   closeProjectSearch={[MockFunction]}
+  cx={
+    Object {
+      "navigateCounter": 0,
+    }
+  }
   doSearchForHighlight={[MockFunction]}
   query="match"
   results={
-    Immutable.List [
+    Array [
       Object {
         "filepath": "testFilePath1",
         "matches": Array [
           Object {
             "column": 30,
             "match": "match1",
+            "type": "MATCH",
             "value": "some thing match1",
           },
           Object {
             "column": 60,
             "match": "match2",
+            "type": "MATCH",
             "value": "some thing match2",
           },
           Object {
             "column": 90,
             "match": "match3",
+            "type": "MATCH",
             "value": "some thing match3",
           },
         ],
+        "type": "RESULT",
       },
       Object {
         "filepath": "testFilePath2",
@@ -73,19 +81,23 @@ exports[`ProjectSearch found search results 1`] = `
           Object {
             "column": 80,
             "match": "match4",
+            "type": "MATCH",
             "value": "some thing match4",
           },
           Object {
             "column": 40,
             "match": "match5",
+            "type": "MATCH",
             "value": "some thing match5",
           },
         ],
+        "type": "RESULT",
       },
     ]
   }
   searchSources={[MockFunction]}
   selectSpecificLocation={[MockFunction]}
+  setActiveSearch={[MockFunction]}
   sources={Object {}}
   status="DONE"
   updateSearchStatus={[MockFunction]}
@@ -104,9 +116,8 @@ exports[`ProjectSearch found search results 1`] = `
           expanded={false}
           handleClose={[MockFunction]}
           hasPrefix={false}
-          onBlur={[Function]}
+          isLoading={false}
           onChange={[Function]}
-          onFocus={[Function]}
           onHistoryScroll={[Function]}
           onKeyDown={[Function]}
           placeholder="Find in files…"
@@ -118,7 +129,7 @@ exports[`ProjectSearch found search results 1`] = `
           summaryMsg="5 results"
         >
           <div
-            className="search-shadow"
+            className="search-outline"
           >
             <div
               aria-expanded={false}
@@ -127,41 +138,26 @@ exports[`ProjectSearch found search results 1`] = `
               className="search-field big"
               role="combobox"
             >
-              <Svg
-                name="magnifying-glass"
+              <AccessibleImage
+                className="search"
               >
-                <InlineSVG
-                  className="magnifying-glass "
-                  element="i"
-                  raw={false}
-                  src="<svg></svg>"
-                >
-                  <i
-                    className="magnifying-glass "
-                    dangerouslySetInnerHTML={
-                      Object {
-                        "__html": "<svg></svg>",
-                      }
-                    }
-                    src={null}
-                  />
-                </InlineSVG>
-              </Svg>
+                <span
+                  className="img search"
+                />
+              </AccessibleImage>
               <input
                 aria-activedescendant=""
                 aria-autocomplete="list"
                 aria-controls="result-list"
                 className=""
-                onBlur={[Function]}
                 onChange={[Function]}
-                onFocus={[Function]}
                 onKeyDown={[Function]}
                 placeholder="Find in files…"
                 spellCheck={false}
                 value="match"
               />
               <div
-                className="summary"
+                className="search-field-summary"
               >
                 5 results
               </div>
@@ -173,9 +169,13 @@ exports[`ProjectSearch found search results 1`] = `
                   className="close-btn big"
                   onClick={[MockFunction]}
                 >
-                  <img
+                  <AccessibleImage
                     className="close"
-                  />
+                  >
+                    <span
+                      className="img close"
+                    />
+                  </AccessibleImage>
                 </button>
               </CloseButton>
             </div>
@@ -185,11 +185,14 @@ exports[`ProjectSearch found search results 1`] = `
       <ManagedTree
         autoExpandAll={true}
         autoExpandDepth={1}
+        autoExpandNodeChildrenLimit={100}
+        focused={null}
         getChildren={[Function]}
         getParent={[Function]}
         getPath={[Function]}
         getRoots={[Function]}
         itemHeight={24}
+        onFocus={[Function]}
         renderItem={[Function]}
       >
         <div
@@ -198,6 +201,7 @@ exports[`ProjectSearch found search results 1`] = `
           <Tree
             autoExpandAll={true}
             autoExpandDepth={1}
+            autoExpandNodeChildrenLimit={100}
             focused={null}
             getChildren={[Function]}
             getKey={[Function]}
@@ -220,15 +224,11 @@ exports[`ProjectSearch found search results 1`] = `
               onKeyPress={[Function]}
               onKeyUp={[Function]}
               role="tree"
-              style={
-                Object {
-                  "margin": 0,
-                  "padding": 0,
-                }
-              }
+              style={Object {}}
               tabIndex="0"
             >
               <TreeNode
+                active={false}
                 depth={0}
                 expanded={true}
                 focused={false}
@@ -261,7 +261,7 @@ exports[`ProjectSearch found search results 1`] = `
                     "type": "RESULT",
                   }
                 }
-                key="undefined-$"
+                key="undefined-$-inactive"
                 onClick={[Function]}
                 onCollapse={[Function]}
                 onExpand={[Function]}
@@ -274,35 +274,26 @@ exports[`ProjectSearch found search results 1`] = `
                   data-expandable={true}
                   id="undefined-$"
                   onClick={[Function]}
+                  onKeyDownCapture={null}
                   role="treeitem"
                 >
                   <div
                     className="file-result"
                   >
-                    <Svg
-                      className="expanded"
-                      name="arrow"
+                    <AccessibleImage
+                      className="arrow expanded"
                     >
-                      <InlineSVG
-                        className="arrow expanded"
-                        element="i"
-                        raw={false}
-                        src="<svg></svg>"
-                      >
-                        <i
-                          className="arrow expanded"
-                          dangerouslySetInnerHTML={
-                            Object {
-                              "__html": "<svg></svg>",
-                            }
-                          }
-                          src={null}
-                        />
-                      </InlineSVG>
-                    </Svg>
-                    <img
+                      <span
+                        className="img arrow expanded"
+                      />
+                    </AccessibleImage>
+                    <AccessibleImage
                       className="file"
-                    />
+                    >
+                      <span
+                        className="img file"
+                      />
+                    </AccessibleImage>
                     <span
                       className="file-path"
                     />
@@ -315,6 +306,7 @@ exports[`ProjectSearch found search results 1`] = `
                 </div>
               </TreeNode>
               <TreeNode
+                active={false}
                 depth={1}
                 expanded={false}
                 focused={false}
@@ -329,7 +321,7 @@ exports[`ProjectSearch found search results 1`] = `
                     "value": "some thing match1",
                   }
                 }
-                key="undefined-undefined-30-1"
+                key="undefined-undefined-30-1-inactive"
                 onClick={[Function]}
                 onCollapse={[Function]}
                 onExpand={[Function]}
@@ -341,6 +333,7 @@ exports[`ProjectSearch found search results 1`] = `
                   data-expandable={false}
                   id="undefined-undefined-30-1"
                   onClick={[Function]}
+                  onKeyDownCapture={null}
                   role="treeitem"
                 >
                   <span
@@ -367,16 +360,21 @@ exports[`ProjectSearch found search results 1`] = `
                       <span
                         className="query-match"
                         key="1"
-                      />
+                      >
+                        some t
+                      </span>
                       <span
                         className="line-match"
                         key="2"
-                      />
+                      >
+                        some thing match1
+                      </span>
                     </span>
                   </div>
                 </div>
               </TreeNode>
               <TreeNode
+                active={false}
                 depth={1}
                 expanded={false}
                 focused={false}
@@ -391,7 +389,7 @@ exports[`ProjectSearch found search results 1`] = `
                     "value": "some thing match2",
                   }
                 }
-                key="undefined-undefined-60-2"
+                key="undefined-undefined-60-2-inactive"
                 onClick={[Function]}
                 onCollapse={[Function]}
                 onExpand={[Function]}
@@ -403,6 +401,7 @@ exports[`ProjectSearch found search results 1`] = `
                   data-expandable={false}
                   id="undefined-undefined-60-2"
                   onClick={[Function]}
+                  onKeyDownCapture={null}
                   role="treeitem"
                 >
                   <span
@@ -429,16 +428,21 @@ exports[`ProjectSearch found search results 1`] = `
                       <span
                         className="query-match"
                         key="1"
-                      />
+                      >
+                        some t
+                      </span>
                       <span
                         className="line-match"
                         key="2"
-                      />
+                      >
+                        some thing match2
+                      </span>
                     </span>
                   </div>
                 </div>
               </TreeNode>
               <TreeNode
+                active={false}
                 depth={1}
                 expanded={false}
                 focused={false}
@@ -453,7 +457,7 @@ exports[`ProjectSearch found search results 1`] = `
                     "value": "some thing match3",
                   }
                 }
-                key="undefined-undefined-90-3"
+                key="undefined-undefined-90-3-inactive"
                 onClick={[Function]}
                 onCollapse={[Function]}
                 onExpand={[Function]}
@@ -465,6 +469,7 @@ exports[`ProjectSearch found search results 1`] = `
                   data-expandable={false}
                   id="undefined-undefined-90-3"
                   onClick={[Function]}
+                  onKeyDownCapture={null}
                   role="treeitem"
                 >
                   <span
@@ -491,16 +496,21 @@ exports[`ProjectSearch found search results 1`] = `
                       <span
                         className="query-match"
                         key="1"
-                      />
+                      >
+                        some t
+                      </span>
                       <span
                         className="line-match"
                         key="2"
-                      />
+                      >
+                        some thing match3
+                      </span>
                     </span>
                   </div>
                 </div>
               </TreeNode>
               <TreeNode
+                active={false}
                 depth={0}
                 expanded={true}
                 focused={false}
@@ -527,7 +537,7 @@ exports[`ProjectSearch found search results 1`] = `
                     "type": "RESULT",
                   }
                 }
-                key="undefined-4"
+                key="undefined-4-inactive"
                 onClick={[Function]}
                 onCollapse={[Function]}
                 onExpand={[Function]}
@@ -540,35 +550,26 @@ exports[`ProjectSearch found search results 1`] = `
                   data-expandable={true}
                   id="undefined-4"
                   onClick={[Function]}
+                  onKeyDownCapture={null}
                   role="treeitem"
                 >
                   <div
                     className="file-result"
                   >
-                    <Svg
-                      className="expanded"
-                      name="arrow"
+                    <AccessibleImage
+                      className="arrow expanded"
                     >
-                      <InlineSVG
-                        className="arrow expanded"
-                        element="i"
-                        raw={false}
-                        src="<svg></svg>"
-                      >
-                        <i
-                          className="arrow expanded"
-                          dangerouslySetInnerHTML={
-                            Object {
-                              "__html": "<svg></svg>",
-                            }
-                          }
-                          src={null}
-                        />
-                      </InlineSVG>
-                    </Svg>
-                    <img
+                      <span
+                        className="img arrow expanded"
+                      />
+                    </AccessibleImage>
+                    <AccessibleImage
                       className="file"
-                    />
+                    >
+                      <span
+                        className="img file"
+                      />
+                    </AccessibleImage>
                     <span
                       className="file-path"
                     />
@@ -581,6 +582,7 @@ exports[`ProjectSearch found search results 1`] = `
                 </div>
               </TreeNode>
               <TreeNode
+                active={false}
                 depth={1}
                 expanded={false}
                 focused={false}
@@ -595,7 +597,7 @@ exports[`ProjectSearch found search results 1`] = `
                     "value": "some thing match4",
                   }
                 }
-                key="undefined-undefined-80-5"
+                key="undefined-undefined-80-5-inactive"
                 onClick={[Function]}
                 onCollapse={[Function]}
                 onExpand={[Function]}
@@ -607,6 +609,7 @@ exports[`ProjectSearch found search results 1`] = `
                   data-expandable={false}
                   id="undefined-undefined-80-5"
                   onClick={[Function]}
+                  onKeyDownCapture={null}
                   role="treeitem"
                 >
                   <span
@@ -633,16 +636,21 @@ exports[`ProjectSearch found search results 1`] = `
                       <span
                         className="query-match"
                         key="1"
-                      />
+                      >
+                        some t
+                      </span>
                       <span
                         className="line-match"
                         key="2"
-                      />
+                      >
+                        some thing match4
+                      </span>
                     </span>
                   </div>
                 </div>
               </TreeNode>
               <TreeNode
+                active={false}
                 depth={1}
                 expanded={false}
                 focused={false}
@@ -657,7 +665,7 @@ exports[`ProjectSearch found search results 1`] = `
                     "value": "some thing match5",
                   }
                 }
-                key="undefined-undefined-40-6"
+                key="undefined-undefined-40-6-inactive"
                 onClick={[Function]}
                 onCollapse={[Function]}
                 onExpand={[Function]}
@@ -669,6 +677,7 @@ exports[`ProjectSearch found search results 1`] = `
                   data-expandable={false}
                   id="undefined-undefined-40-6"
                   onClick={[Function]}
+                  onKeyDownCapture={null}
                   role="treeitem"
                 >
                   <span
@@ -695,11 +704,15 @@ exports[`ProjectSearch found search results 1`] = `
                       <span
                         className="query-match"
                         key="1"
-                      />
+                      >
+                        some t
+                      </span>
                       <span
                         className="line-match"
                         key="2"
-                      />
+                      >
+                        some thing match5
+                      </span>
                     </span>
                   </div>
                 </div>
@@ -730,9 +743,8 @@ exports[`ProjectSearch should display loading message while search is in progres
         expanded={false}
         handleClose={[MockFunction]}
         hasPrefix={false}
-        onBlur={[Function]}
+        isLoading={true}
         onChange={[Function]}
-        onFocus={[Function]}
         onHistoryScroll={[Function]}
         onKeyDown={[Function]}
         placeholder="Find in files…"
@@ -768,9 +780,8 @@ exports[`ProjectSearch showErrorEmoji false if not done & no results 1`] = `
         expanded={false}
         handleClose={[MockFunction]}
         hasPrefix={false}
-        onBlur={[Function]}
+        isLoading={true}
         onChange={[Function]}
-        onFocus={[Function]}
         onHistoryScroll={[Function]}
         onKeyDown={[Function]}
         placeholder="Find in files…"
@@ -806,9 +817,8 @@ exports[`ProjectSearch showErrorEmoji false if not done & results 1`] = `
         expanded={false}
         handleClose={[MockFunction]}
         hasPrefix={false}
-        onBlur={[Function]}
+        isLoading={true}
         onChange={[Function]}
-        onFocus={[Function]}
         onHistoryScroll={[Function]}
         onKeyDown={[Function]}
         placeholder="Find in files…"
@@ -820,11 +830,19 @@ exports[`ProjectSearch showErrorEmoji false if not done & results 1`] = `
         summaryMsg="5 results"
       />
     </div>
-    <div
-      className="no-result-msg absolute-center"
-    >
-      Loading…
-    </div>
+    <ManagedTree
+      autoExpandAll={true}
+      autoExpandDepth={1}
+      autoExpandNodeChildrenLimit={100}
+      focused={null}
+      getChildren={[Function]}
+      getParent={[Function]}
+      getPath={[Function]}
+      getRoots={[Function]}
+      itemHeight={24}
+      onFocus={[Function]}
+      renderItem={[Function]}
+    />
   </div>
 </div>
 `;
@@ -844,9 +862,8 @@ exports[`ProjectSearch turns off shortcuts on unmount 1`] = `
         expanded={false}
         handleClose={[MockFunction]}
         hasPrefix={false}
-        onBlur={[Function]}
+        isLoading={false}
         onChange={[Function]}
-        onFocus={[Function]}
         onHistoryScroll={[Function]}
         onKeyDown={[Function]}
         placeholder="Find in files…"
@@ -877,9 +894,8 @@ exports[`ProjectSearch where <Enter> has not been pressed 1`] = `
         expanded={false}
         handleClose={[MockFunction]}
         hasPrefix={false}
-        onBlur={[Function]}
+        isLoading={false}
         onChange={[Function]}
-        onFocus={[Function]}
         onHistoryScroll={[Function]}
         onKeyDown={[Function]}
         placeholder="Find in files…"

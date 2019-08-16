@@ -4,146 +4,44 @@
 
 // @flow
 
-import {
-  getSource,
-  getSourceFromId,
-  hasSymbols,
-  getSelectedLocation,
-  isPaused
-} from "../selectors";
-
-import { mapFrames, fetchExtra } from "./pause";
-import { updateTab } from "./tabs";
+import { getSourceWithContent, getSelectedLocation } from "../selectors";
 
 import { setInScopeLines } from "./ast/setInScopeLines";
-import {
-  getSymbols,
-  findOutOfScopeLocations,
-  getFramework,
-  getPausePoints,
-  type AstPosition
-} from "../workers/parser";
 
-import { PROMISE } from "./utils/middleware/promise";
-import { features } from "../utils/prefs";
-import { isLoaded, isGenerated } from "../utils/source";
-
-import type { SourceId } from "../types";
+import type { Context } from "../types";
 import type { ThunkArgs, Action } from "./types";
 
-export function setSourceMetaData(sourceId: SourceId) {
-  return async ({ dispatch, getState }: ThunkArgs) => {
-    const source = getSource(getState(), sourceId);
-    if (!source || !isLoaded(source) || source.isWasm) {
-      return;
-    }
-
-    const framework = await getFramework(source.id);
-    if (framework) {
-      dispatch(updateTab(source, framework));
-    }
-
-    dispatch(
-      ({
-        type: "SET_SOURCE_METADATA",
-        sourceId: source.id,
-        sourceMetaData: {
-          framework
-        }
-      }: Action)
-    );
-  };
-}
-
-export function setSymbols(sourceId: SourceId) {
-  return async ({ dispatch, getState }: ThunkArgs) => {
-    const source = getSourceFromId(getState(), sourceId);
-
-    if (source.isWasm || hasSymbols(getState(), source) || !isLoaded(source)) {
-      return;
-    }
-
-    await dispatch({
-      type: "SET_SYMBOLS",
-      sourceId,
-      [PROMISE]: getSymbols(sourceId)
-    });
-
-    if (isPaused(getState())) {
-      await dispatch(fetchExtra());
-      await dispatch(mapFrames());
-    }
-
-    await dispatch(setPausePoints(sourceId));
-    await dispatch(setSourceMetaData(sourceId));
-  };
-}
-
-export function setOutOfScopeLocations() {
-  return async ({ dispatch, getState }: ThunkArgs) => {
+export function setOutOfScopeLocations(cx: Context) {
+  return async ({ dispatch, getState, parser }: ThunkArgs) => {
     const location = getSelectedLocation(getState());
     if (!location) {
       return;
     }
 
-    const source = getSourceFromId(getState(), location.sourceId);
+    const { source, content } = getSourceWithContent(
+      getState(),
+      location.sourceId
+    );
+
+    if (!content) {
+      return;
+    }
 
     let locations = null;
-    if (location.line && source && !source.isWasm && isPaused(getState())) {
-      locations = await findOutOfScopeLocations(
+    if (location.line && source && !source.isWasm) {
+      locations = await parser.findOutOfScopeLocations(
         source.id,
-        ((location: any): AstPosition)
+        ((location: any): parser.AstPosition)
       );
     }
 
     dispatch(
       ({
         type: "OUT_OF_SCOPE_LOCATIONS",
+        cx,
         locations
       }: Action)
     );
-    dispatch(setInScopeLines());
-  };
-}
-
-function compressPausePoints(pausePoints) {
-  const compressed = {};
-  for (const line in pausePoints) {
-    compressed[line] = {};
-    for (const col in pausePoints[line]) {
-      const point = pausePoints[line][col];
-      compressed[line][col] = (point.break ? 1 : 0) | (point.step ? 2 : 0);
-    }
-  }
-
-  return compressed;
-}
-
-export function setPausePoints(sourceId: SourceId) {
-  return async ({ dispatch, getState, client }: ThunkArgs) => {
-    const source = getSourceFromId(getState(), sourceId);
-    if (!features.pausePoints || !source || !source.text) {
-      return;
-    }
-
-    if (source.isWasm) {
-      return;
-    }
-
-    const pausePoints = await getPausePoints(sourceId);
-    const compressed = compressPausePoints(pausePoints);
-
-    if (isGenerated(source)) {
-      await client.setPausePoints(sourceId, compressed);
-    }
-
-    dispatch(
-      ({
-        type: "SET_PAUSE_POINTS",
-        sourceText: source.text || "",
-        sourceId,
-        pausePoints
-      }: Action)
-    );
+    dispatch(setInScopeLines(cx));
   };
 }
